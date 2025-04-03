@@ -252,32 +252,35 @@ def _worker_test_all_to_all(
     pgi: ProcessGroupInfo,
     dp_size: int,
     in_dtype: str,
+    out_dtype: str,
     moe_config: MoEConfig,
 ) -> None:
     uid = nvshmem_get_unique_id() if pgi.rank == 0 else nvshmem_alloc_empty_unique_id()
     torch.distributed.broadcast(uid, src=0)
     nvshmem_init(uid, pgi.rank, pgi.world_size)
 
-    moe_config = dataclasses.replace(moe_config, in_dtype=getattr(torch, in_dtype))
+    moe_config = dataclasses.replace(moe_config, in_dtype=getattr(torch, in_dtype), out_dtype=getattr(torch, out_dtype))
     _do_test_all_to_all(pgi, dp_size, moe_config)
 
     nvshmem_finalize()
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 4, reason="Requires at least 4 GPUs")
-@pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn"])
-def test_all_to_all_4_gpu(in_dtype: str) -> None:
+@pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn", "float16"])
+@pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
+def test_all_to_all_4_gpu(in_dtype: str, out_dtype: str) -> None:
     world_size = 4
     dp_size = 2
-    parallel_launch(world_size, _worker_test_all_to_all, dp_size, in_dtype, small_moe)
+    parallel_launch(world_size, _worker_test_all_to_all, dp_size, in_dtype, out_dtype, small_moe)
 
 
-def _worker_test_all_to_all_multi_node(pgi: ProcessGroupInfo, in_dtype: str) -> None:
+def _worker_test_all_to_all_multi_node(pgi: ProcessGroupInfo, in_dtype: str, out_dtype: str) -> None:
     dp_size = 4
-    _worker_test_all_to_all(pgi, dp_size, in_dtype, medium_moe)
+    _worker_test_all_to_all(pgi, dp_size, in_dtype, out_dtype, medium_moe)
 
 
 @require_multi_node
-@pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn"])
-def test_all_to_all_multi_node(in_dtype: str) -> None:
-    parallel_launch_from_env(_worker_test_all_to_all_multi_node, in_dtype)
+@pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn", "float16"])
+@pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
+def test_all_to_all_multi_node(in_dtype: str, out_dtype: str) -> None:
+    parallel_launch_from_env(_worker_test_all_to_all_multi_node, in_dtype, out_dtype)

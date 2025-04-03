@@ -96,9 +96,9 @@ public:
   /// Shape: [1].
   ///
   /// @param stream The CUDA stream to launch the kernel on.
-  template <typename T>
+  template <typename T, typename U>
   void combine(
-      const Strided1D<nv_bfloat16> &outTokens,
+      const Strided1D<U> &outTokens,
       const Strided2D<uint32_t> &indices,
       const Strided2D<float> &weights,
       const Strided2D<T> &expertX,

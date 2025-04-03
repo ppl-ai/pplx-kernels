@@ -8,9 +8,9 @@
 
 using namespace pplx;
 
-template <typename T, size_t NUM_WARPS, bool DO_SEND, bool DO_RECV>
+template <typename T, typename U, size_t NUM_WARPS, bool DO_SEND, bool DO_RECV>
 __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
-    nv_bfloat16 *outTokens,
+    U *outTokens,
     size_t outTokensStrideElem,
     uint32_t *indices,
     size_t indicesStrideElem,
@@ -104,7 +104,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
       __syncthreads();
       combineSignalBuffer[i] = 0;
 
-      nv_bfloat16 *dstPtr = outTokens + i * outTokensStrideElem;
+      U *dstPtr = outTokens + i * outTokensStrideElem;
       constexpr unsigned VEC_SIZE = 8;
       for (unsigned j = threadIdx.x * VEC_SIZE; j < hiddenDim; j += blockDim.x * VEC_SIZE) {
         float sum[VEC_SIZE];
@@ -140,9 +140,9 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
   }
 }
 
-template <typename T>
+template <typename T, typename U>
 void AllToAllInterNode::combine(
-    const Strided1D<nv_bfloat16> &outTokens,
+    const Strided1D<U> &outTokens,
     const Strided2D<uint32_t> &indices,
     const Strided2D<float> &weights,
     const Strided2D<T> &expertX,
@@ -165,7 +165,7 @@ void AllToAllInterNode::combine(
   dim3 dimBlock(NUM_WARPS * 32, 1, 1);
 
   void *args[] = {
-      const_cast<nv_bfloat16 **>(&outTokens.data),
+      const_cast<U **>(&outTokens.data),
       const_cast<size_t *>(&outTokens.strideElem),
       const_cast<uint32_t **>(&indices.data),
       const_cast<size_t *>(&indices.strideElem),
@@ -198,17 +198,17 @@ void AllToAllInterNode::combine(
   switch (splitMode) {
   case SplitMode::SEND:
     CUDACHECK(cudaLaunchCooperativeKernel(
-        (void *)&combineKernel<T, NUM_WARPS, true, false>, dimGrid, dimBlock, args, 0, stream
+        (void *)&combineKernel<T, U, NUM_WARPS, true, false>, dimGrid, dimBlock, args, 0, stream
     ));
     break;
   case SplitMode::RECV:
     CUDACHECK(cudaLaunchCooperativeKernel(
-        (void *)&combineKernel<T, NUM_WARPS, false, true>, dimGrid, dimBlock, args, 0, stream
+        (void *)&combineKernel<T, U, NUM_WARPS, false, true>, dimGrid, dimBlock, args, 0, stream
     ));
     break;
   case SplitMode::NONE:
     CUDACHECK(cudaLaunchCooperativeKernel(
-        (void *)&combineKernel<T, NUM_WARPS, true, true>, dimGrid, dimBlock, args, 0, stream
+        (void *)&combineKernel<T, U, NUM_WARPS, true, true>, dimGrid, dimBlock, args, 0, stream
     ));
     break;
   default:
@@ -217,18 +217,21 @@ void AllToAllInterNode::combine(
   nvtxRangePop();
 }
 
-#define INSTANTIATE_COMBINE(T)                                                                     \
-  template void AllToAllInterNode::combine<T>(                                                     \
-      const Strided1D<nv_bfloat16> &outTokens,                                                     \
-      const Strided2D<uint32_t> &indices,                                                          \
-      const Strided2D<float> &weights,                                                             \
-      const Strided2D<T> &expertX,                                                                 \
-      unsigned m,                                                                                  \
-      const unsigned *boundM,                                                                      \
-      SplitMode splitMode,                                                                         \
-      cudaStream_t stream                                                                          \
+#define INSTANTIATE_COMBINE(T, U)                                                       \
+  template void AllToAllInterNode::combine<T, U>(                                       \
+      const Strided1D<U> &outTokens,                                                    \
+      const Strided2D<uint32_t> &indices,                                               \
+      const Strided2D<float> &weights,                                                  \
+      const Strided2D<T> &expertX,                                                      \
+      unsigned m,                                                                       \
+      const unsigned *boundM,                                                           \
+      SplitMode splitMode,                                                              \
+      cudaStream_t stream                                                               \
   );
 
-INSTANTIATE_COMBINE(float)
-INSTANTIATE_COMBINE(half)
-INSTANTIATE_COMBINE(nv_bfloat16)
+INSTANTIATE_COMBINE(float, nv_bfloat16)
+INSTANTIATE_COMBINE(half, nv_bfloat16)
+INSTANTIATE_COMBINE(nv_bfloat16, nv_bfloat16)
+INSTANTIATE_COMBINE(float, half)
+INSTANTIATE_COMBINE(half, half)
+INSTANTIATE_COMBINE(nv_bfloat16, half)
