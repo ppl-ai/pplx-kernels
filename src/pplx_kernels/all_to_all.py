@@ -21,6 +21,9 @@ class AllToAll:
         assert world_size % dp_size == 0
         assert world_size // dp_size > 1
 
+        self.world_size = world_size
+        self.dp_size = dp_size
+        self.max_num_tokens = max_num_tokens
         self._has_scales = hidden_dim_scale_bytes > 0
 
         self._ptr = _ops.all_to_all_create(
