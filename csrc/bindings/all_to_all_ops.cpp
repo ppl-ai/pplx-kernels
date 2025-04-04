@@ -166,7 +166,7 @@ void combine(
     );
   };
 
-  auto dispatch_run = [&]<typename T>(at::ScalarType const& out_dtype) {
+  auto out_type_switch = [&]<typename T>(at::ScalarType const& out_dtype) {
     switch(out_dtype) {
       case at::kBFloat16:
         run.operator()<T, nv_bfloat16>();
@@ -175,22 +175,22 @@ void combine(
         run.operator()<T, half>();
         break;
       default:
-        TORCH_CHECK(false, "Unsupported out dtype for expertY");
+        TORCH_CHECK(false, "Unsupported dtype for outTokens");
     }
   };
 
   switch (expertY.scalar_type()) {
   case at::kFloat:
-    dispatch_run.operator()<float>(outTokens.scalar_type());
+    out_type_switch.operator()<float>(outTokens.scalar_type());
     break;
   case at::kBFloat16:
-    dispatch_run.operator()<nv_bfloat16>(outTokens.scalar_type());
+    out_type_switch.operator()<nv_bfloat16>(outTokens.scalar_type());
     break;
   case at::kHalf:
-    dispatch_run.operator()<half>(outTokens.scalar_type());
+    out_type_switch.operator()<half>(outTokens.scalar_type());
     break;
   default:
-    TORCH_CHECK(false, "Unsupported input dtype for expertY");
+    TORCH_CHECK(false, "Unsupported dtype for expertY");
   }
 }
 
