@@ -19,7 +19,7 @@
 
 using namespace pplx;
 
-template <typename T, typename Kernel>
+template <typename T, typename U, typename Kernel>
 bool testDispatchCombine(
     cudaStream_t stream,
     unsigned dpRank,
@@ -75,7 +75,7 @@ bool testDispatchCombine(
   DeviceBuffer<float> outExpertScaleDevice(
       expertsPerRank * maxNumTokens * numDPGroups * rank.hiddenDimScale
   );
-  DeviceBuffer<nv_bfloat16> outTokensDevice(maxNumTokens * hiddenDim);
+  DeviceBuffer<U> outTokensDevice(maxNumTokens * hiddenDim);
 
   const size_t hiddenDimBytes = rank.hiddenDim * sizeof(T);
   const size_t hiddenDimScaleBytes = rank.hiddenDimScale * sizeof(float);
@@ -113,7 +113,7 @@ bool testDispatchCombine(
   CUDACHECK(cudaStreamSynchronize(stream));
 
   allToAll.combine(
-      Strided1D<nv_bfloat16>(outTokensDevice, hiddenDim),
+      Strided1D<U>(outTokensDevice, hiddenDim),
       Strided2D<uint32_t>(indicesDevice, 1, expertsPerToken),
       Strided2D<float>(weightsDevice, 1, expertsPerToken),
       Strided2D<T>(outExpertDevice, hiddenDim, hiddenDim * maxNumTokens * numDPGroups),
@@ -127,7 +127,7 @@ bool testDispatchCombine(
   HostBuffer<int32_t> outNumTokensPerExpertHost(outTokensPerExpertDevice);
   HostBuffer<T> outExpertHost(outExpertDevice);
   HostBuffer<float> outExpertScaleHost(outExpertScaleDevice);
-  HostBuffer<nv_bfloat16> outTokensHost(outTokensDevice);
+  HostBuffer<U> outTokensHost(outTokensDevice);
 
   // Print the results.
   for (unsigned i = 0; i < epSize; ++i) {
@@ -322,10 +322,16 @@ int main(int argc, char **argv) {
 
   // Run the tests.
   int exit_code = EXIT_SUCCESS;
-  if (!testDispatchCombine<float, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+  if (!testDispatchCombine<float, nv_bfloat16, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
     exit_code = EXIT_FAILURE;
   }
-  if (!testDispatchCombine<nv_bfloat16, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+  if (!testDispatchCombine<nv_bfloat16, nv_bfloat16, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+    exit_code = EXIT_FAILURE;
+  }
+  if (!testDispatchCombine<float, half, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+    exit_code = EXIT_FAILURE;
+  }
+  if (!testDispatchCombine<nv_bfloat16, half, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
     exit_code = EXIT_FAILURE;
   }
 
