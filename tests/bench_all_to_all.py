@@ -234,30 +234,32 @@ def _worker_bench_all_to_all(
     pgi: ProcessGroupInfo,
     dp_size: int,
     in_dtype_str: str,
+    out_dtype_str: str,
 ) -> None:
     uid = nvshmem_get_unique_id() if pgi.rank == 0 else nvshmem_alloc_empty_unique_id()
     torch.distributed.broadcast(uid, src=0)
     nvshmem_init(uid, pgi.rank, pgi.world_size)
 
     in_dtype = getattr(torch, in_dtype_str)
+    out_dtype = getattr(torch, out_dtype_str)
     assert isinstance(in_dtype, torch.dtype)
     configs = [
         # V2-Lite:  64 Experts, 6 Experts per Token, 2048 Hidden Dim
-        MoEConfig(64, 6, 2048, 1, in_dtype),
-        MoEConfig(64, 6, 2048, 4, in_dtype),
-        MoEConfig(64, 6, 2048, 8, in_dtype),
-        MoEConfig(64, 6, 2048, 16, in_dtype),
-        MoEConfig(64, 6, 2048, 32, in_dtype),
-        MoEConfig(64, 6, 2048, 64, in_dtype),
-        MoEConfig(64, 6, 2048, 128, in_dtype),
+        MoEConfig(64, 6, 2048, 1, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 4, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 8, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 16, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 32, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 64, in_dtype, out_dtype),
+        MoEConfig(64, 6, 2048, 128, in_dtype, out_dtype),
         # R1     : 256 Experts, 8 Experts per Token, 7168 Hidden Dim
-        MoEConfig(256, 8, 7168, 1, in_dtype),
-        MoEConfig(256, 8, 7168, 4, in_dtype),
-        MoEConfig(256, 8, 7168, 8, in_dtype),
-        MoEConfig(256, 8, 7168, 16, in_dtype),
-        MoEConfig(256, 8, 7168, 32, in_dtype),
-        MoEConfig(256, 8, 7168, 64, in_dtype),
-        MoEConfig(256, 8, 7168, 128, in_dtype),
+        MoEConfig(256, 8, 7168, 1, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 4, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 8, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 16, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 32, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 64, in_dtype, out_dtype),
+        MoEConfig(256, 8, 7168, 128, in_dtype, out_dtype),
     ]
 
     header = [
@@ -343,15 +345,21 @@ def main() -> None:
         choices=["bfloat16", "float8_e4m3fn"],
         default="float8_e4m3fn",
     )
+    parser.add_argument(
+        "--out-dtype",
+        choices=["bfloat16", "float16"],
+        default="bfloat16",
+    )
     args = parser.parse_args()
     dp_size = int(args.dp_size)
     in_dtype = str(args.in_dtype)
+    out_dtype = str(args.out_dtype)
 
     if "MASTER_ADDR" in os.environ:
-        parallel_launch_from_env(_worker_bench_all_to_all, dp_size, in_dtype)
+        parallel_launch_from_env(_worker_bench_all_to_all, dp_size, in_dtype, out_dtype)
     else:
         world_size = torch.cuda.device_count()
-        parallel_launch(world_size, _worker_bench_all_to_all, dp_size, in_dtype)
+        parallel_launch(world_size, _worker_bench_all_to_all, dp_size, in_dtype, out_dtype)
 
 
 if __name__ == "__main__":
