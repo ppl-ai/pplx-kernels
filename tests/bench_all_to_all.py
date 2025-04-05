@@ -342,7 +342,7 @@ def main() -> None:
     parser.add_argument("--dp-size", type=int, default=1)
     parser.add_argument(
         "--in-dtype",
-        choices=["bfloat16", "float8_e4m3fn"],
+        choices=["bfloat16", "float16", "float8_e4m3fn"],
         default="float8_e4m3fn",
     )
     parser.add_argument(
