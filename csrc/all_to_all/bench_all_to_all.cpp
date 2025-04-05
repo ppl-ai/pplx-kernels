@@ -240,16 +240,16 @@ int main(int argc, char **argv) {
   };
 
   auto maybe_print_bench_results = [](int const myPE,
-                                      BenchConfig const& config,
-                                      Time const& dispatch_time,
-                                      Time const& combine_time,
+                                      BenchConfig const &config,
+                                      Time const &dispatch_time,
+                                      Time const &combine_time,
                                       std::string const description = "") {
     if (myPE == 0) {
       auto [dispatchMean, dispatchStddev] = dispatch_time;
       auto [combineMean, combineStddev] = combine_time;
-      std::cout << description << std::setw(6) << config.numTokens << " " << std::setw(3) << config.numExperts
-                << " " << std::setw(3) << config.expertsPerToken << " " << std::setw(4)
-                << config.hiddenDim << " " << std::fixed << std::setprecision(3)
+      std::cout << description << std::setw(6) << config.numTokens << " " << std::setw(3)
+                << config.numExperts << " " << std::setw(3) << config.expertsPerToken << " "
+                << std::setw(4) << config.hiddenDim << " " << std::fixed << std::setprecision(3)
                 << "Dispatch: " << std::setw(10) << dispatchMean << "us ± " << dispatchStddev
                 << "us "
                 << "Combine: " << std::setw(10) << combineMean << "us ± " << combineStddev << "us"
@@ -258,7 +258,8 @@ int main(int argc, char **argv) {
   };
 
   for (const auto &config : configs) {
-    auto [dispatch, combine] = benchmark<nv_bfloat16, nv_bfloat16>(10, config, currentPE, numPEs, stream);
+    auto [dispatch, combine] =
+        benchmark<nv_bfloat16, nv_bfloat16>(10, config, currentPE, numPEs, stream);
     maybe_print_bench_results(currentPE, config, dispatch, combine, "nv_bfloat16->nv_bfloat16:");
   }
 

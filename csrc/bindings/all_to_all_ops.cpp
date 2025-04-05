@@ -136,7 +136,10 @@ void combine(
     bool doRecv
 ) {
   _CHECK_TENSOR(2, outTokens);
-  TORCH_CHECK(outTokens.scalar_type() == at::kBFloat16 || outTokens.scalar_type() == at::kHalf, "outTokens must be of type BFloat16 or Float16");
+  TORCH_CHECK(
+      outTokens.scalar_type() == at::kBFloat16 || outTokens.scalar_type() == at::kHalf,
+      "outTokens must be of type BFloat16 or Float16"
+  );
   _CHECK_TENSOR(2, indices);
   TORCH_CHECK(indices.scalar_type() == at::kUInt32, "indices must be of type UInt32");
   _CHECK_TENSOR(2, weights);
@@ -151,7 +154,7 @@ void combine(
   auto *all_to_all = (AllToAllInterNode *)ptr;
   auto run = [&]<typename T, typename U>() {
     all_to_all->combine<T, U>(
-        Strided1D<U>((U*)outTokens.data_ptr(), (size_t)outTokens.stride(0)),
+        Strided1D<U>((U *)outTokens.data_ptr(), (size_t)outTokens.stride(0)),
         Strided2D<uint32_t>(
             indices.data_ptr<uint32_t>(), (size_t)indices.stride(1), (size_t)indices.stride(0)
         ),
@@ -166,16 +169,16 @@ void combine(
     );
   };
 
-  auto out_type_switch = [&]<typename T>(at::ScalarType const& out_dtype) {
-    switch(out_dtype) {
-      case at::kBFloat16:
-        run.operator()<T, nv_bfloat16>();
-        break;
-      case at::kHalf:
-        run.operator()<T, half>();
-        break;
-      default:
-        TORCH_CHECK(false, "Unsupported dtype for outTokens");
+  auto out_type_switch = [&]<typename T>(at::ScalarType const &out_dtype) {
+    switch (out_dtype) {
+    case at::kBFloat16:
+      run.operator()<T, nv_bfloat16>();
+      break;
+    case at::kHalf:
+      run.operator()<T, half>();
+      break;
+    default:
+      TORCH_CHECK(false, "Unsupported dtype for outTokens");
     }
   };
 

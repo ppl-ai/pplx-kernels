@@ -322,16 +322,22 @@ int main(int argc, char **argv) {
 
   // Run the tests.
   int exit_code = EXIT_SUCCESS;
-  if (!testDispatchCombine<float, nv_bfloat16, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+  if (!testDispatchCombine<float, nv_bfloat16, AllToAllInterNode>(
+          stream, rank / 2, 2, rank, world_size
+      )) {
     exit_code = EXIT_FAILURE;
   }
-  if (!testDispatchCombine<nv_bfloat16, nv_bfloat16, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+  if (!testDispatchCombine<nv_bfloat16, nv_bfloat16, AllToAllInterNode>(
+          stream, rank / 2, 2, rank, world_size
+      )) {
     exit_code = EXIT_FAILURE;
   }
   if (!testDispatchCombine<float, half, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
     exit_code = EXIT_FAILURE;
   }
-  if (!testDispatchCombine<nv_bfloat16, half, AllToAllInterNode>(stream, rank / 2, 2, rank, world_size)) {
+  if (!testDispatchCombine<nv_bfloat16, half, AllToAllInterNode>(
+          stream, rank / 2, 2, rank, world_size
+      )) {
     exit_code = EXIT_FAILURE;
   }
 

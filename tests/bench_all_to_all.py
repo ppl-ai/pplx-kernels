@@ -359,7 +359,9 @@ def main() -> None:
         parallel_launch_from_env(_worker_bench_all_to_all, dp_size, in_dtype, out_dtype)
     else:
         world_size = torch.cuda.device_count()
-        parallel_launch(world_size, _worker_bench_all_to_all, dp_size, in_dtype, out_dtype)
+        parallel_launch(
+            world_size, _worker_bench_all_to_all, dp_size, in_dtype, out_dtype
+        )
 
 
 if __name__ == "__main__":

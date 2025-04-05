@@ -217,16 +217,16 @@ void AllToAllInterNode::combine(
   nvtxRangePop();
 }
 
-#define INSTANTIATE_COMBINE(T, U)                                                       \
-  template void AllToAllInterNode::combine<T, U>(                                       \
-      const Strided1D<U> &outTokens,                                                    \
-      const Strided2D<uint32_t> &indices,                                               \
-      const Strided2D<float> &weights,                                                  \
-      const Strided2D<T> &expertX,                                                      \
-      unsigned m,                                                                       \
-      const unsigned *boundM,                                                           \
-      SplitMode splitMode,                                                              \
-      cudaStream_t stream                                                               \
+#define INSTANTIATE_COMBINE(T, U)                                                                  \
+  template void AllToAllInterNode::combine<T, U>(                                                  \
+      const Strided1D<U> &outTokens,                                                               \
+      const Strided2D<uint32_t> &indices,                                                          \
+      const Strided2D<float> &weights,                                                             \
+      const Strided2D<T> &expertX,                                                                 \
+      unsigned m,                                                                                  \
+      const unsigned *boundM,                                                                      \
+      SplitMode splitMode,                                                                         \
+      cudaStream_t stream                                                                          \
   );
 
 INSTANTIATE_COMBINE(float, nv_bfloat16)
