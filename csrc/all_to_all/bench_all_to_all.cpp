@@ -40,7 +40,7 @@ Time average(const std::vector<float> &timesUs) {
   return std::make_pair(mean, stddev);
 }
 
-template <typename T>
+template <typename T, typename U>
 std::pair<Time, Time> benchmark(
     unsigned repeat,
     const BenchConfig &config,
@@ -65,7 +65,7 @@ std::pair<Time, Time> benchmark(
   DeviceBuffer<float> outExpertScaleDevice(
       expertsPerRank * config.numTokens * numPEs * data.hiddenDimScale
   );
-  DeviceBuffer<nv_bfloat16> outTokensDevice(config.numTokens * data.hiddenDim);
+  DeviceBuffer<U> outTokensDevice(config.numTokens * data.hiddenDim);
   DeviceBuffer<T> xDevice(data.x);
   DeviceBuffer<float> xScaleDevice(data.xScale);
   DeviceBuffer<uint32_t> indicesDevice(data.indices);
@@ -128,8 +128,8 @@ std::pair<Time, Time> benchmark(
 
       CUDACHECK(cudaEventRecord(std::get<1>(events[i]), stream));
 
-      allToAll.combine<T>(
-          Strided1D<nv_bfloat16>(outTokensDevice, config.hiddenDim),
+      allToAll.combine<T, U>(
+          Strided1D<U>(outTokensDevice, config.hiddenDim),
           Strided2D<uint32_t>(indicesDevice, 1, config.expertsPerToken),
           Strided2D<float>(weightsDevice, 1, config.expertsPerToken),
           Strided2D<T>(
@@ -239,12 +239,15 @@ int main(int argc, char **argv) {
       {128, 256, 8, 7168, 128},
   };
 
-  for (const auto &config : configs) {
-    auto [dispatch, combine] = benchmark<nv_bfloat16>(10, config, currentPE, numPEs, stream);
-    if (currentPE == 0) {
-      auto [dispatchMean, dispatchStddev] = dispatch;
-      auto [combineMean, combineStddev] = combine;
-      std::cout << std::setw(3) << config.numTokens << " " << std::setw(3) << config.numExperts
+  auto maybe_print_bench_results = [](int const myPE,
+                                      BenchConfig const& config,
+                                      Time const& dispatch_time,
+                                      Time const& combine_time,
+                                      std::string const description = "") {
+    if (myPE == 0) {
+      auto [dispatchMean, dispatchStddev] = dispatch_time;
+      auto [combineMean, combineStddev] = combine_time;
+      std::cout << description << std::setw(3) << config.numTokens << " " << std::setw(3) << config.numExperts
                 << " " << std::setw(3) << config.expertsPerToken << " " << std::setw(4)
                 << config.hiddenDim << " " << std::fixed << std::setprecision(3)
                 << "Dispatch: " << std::setw(10) << dispatchMean << "us ± " << dispatchStddev
@@ -252,6 +255,16 @@ int main(int argc, char **argv) {
                 << "Combine: " << std::setw(10) << combineMean << "us ± " << combineStddev << "us"
                 << std::endl;
     }
+  };
+
+  for (const auto &config : configs) {
+    auto [dispatch, combine] = benchmark<nv_bfloat16, nv_bfloat16>(10, config, currentPE, numPEs, stream);
+    maybe_print_bench_results(currentPE, config, dispatch, combine, "nv_bfloat16 -> nv_bfloat16");
+  }
+
+  for (const auto &config : configs) {
+    auto [dispatch, combine] = benchmark<half, half>(10, config, currentPE, numPEs, stream);
+    maybe_print_bench_results(currentPE, config, dispatch, combine, "half -> half");
   }
 
   // Cleanup.
