@@ -270,7 +270,7 @@ void AllToAllInterNode::dispatch(
       std::max(
           ceil_div<unsigned>(numExperts, NUM_WARPS), (unsigned)(maxNumTokens * expertsPerToken)
       ),
-      132u
+      static_cast<unsigned>(numSMs)
   );
   dim3 dimGrid(numBlocks, 1, 1);
   dim3 dimBlock(NUM_WARPS * 32, 1, 1);

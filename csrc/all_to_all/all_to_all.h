@@ -63,6 +63,8 @@ protected:
   const unsigned worldSize;
   /// The size of a DP group.
   const unsigned dpSize;
+  /// The number of streaming multiprocessors (SMs) on the device.
+  const int numSMs;
 };
 
 } // namespace pplx

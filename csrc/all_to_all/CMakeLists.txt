@@ -4,6 +4,10 @@ add_library(all_to_all_common STATIC
     all_to_all.cpp
 )
 
+target_link_libraries(all_to_all_common PUBLIC
+    CUDA::cudart
+)
+
 add_library(all_to_all_intranode_lib STATIC
     intranode_combine.cu
     intranode_dispatch.cu

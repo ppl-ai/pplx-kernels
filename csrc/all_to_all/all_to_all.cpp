@@ -1,5 +1,6 @@
 #include "all_to_all.h"
 
+#include "core/cuda_utils.h"
 #include "core/utils.h"
 
 using namespace pplx;
@@ -25,7 +26,8 @@ AllToAll::AllToAll(
       hiddenDimScaleBytes(hiddenDimScaleBytes),
       rank(rank),
       worldSize(worldSize),
-      dpSize(dpSize) {
+      dpSize(dpSize),
+      numSMs(get_sm_count()) {
 
   ROSE_ASSERT(hiddenDimBytes % 16 == 0, "invalid hidden dim bytes");
   ROSE_ASSERT(hiddenDimScaleBytes % 16 == 0, "invalid hidden dim scale bytes");

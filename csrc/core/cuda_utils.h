@@ -20,4 +20,14 @@ template <typename T> T *mallocZeroBuffer(size_t size) {
   cudaMemset(ptr, 0, size * sizeof(T));
   return ptr;
 }
+
+inline int get_sm_count() {
+  int device;
+  CUDACHECK(cudaGetDevice(&device));
+  int numSMs;
+  CUDACHECK(cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, device));
+
+  return numSMs;
+}
+
 } // namespace pplx

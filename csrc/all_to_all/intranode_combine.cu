@@ -178,7 +178,7 @@ void AllToAllIntraNode::combine(
   const size_t numLocalExperts = numExperts / worldSize;
   const size_t numDPGroups = worldSize / dpSize;
   const size_t batchNumTokens = numLocalExperts * numDPGroups * maxNumTokens;
-  const size_t numBlocks = std::min(132ul, batchNumTokens);
+  const size_t numBlocks = std::min(static_cast<size_t>(numSMs), batchNumTokens);
 
   assert(hiddenDimBytes % 16 == 0);
 
