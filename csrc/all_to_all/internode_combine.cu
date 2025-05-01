@@ -218,7 +218,7 @@ void AllToAllInterNode::combine(
     ));
     break;
   default:
-    ROSE_UNREACHABLE("invalid split mode");
+    PPLX_UNREACHABLE("invalid split mode");
   }
   nvtxRangePop();
 }

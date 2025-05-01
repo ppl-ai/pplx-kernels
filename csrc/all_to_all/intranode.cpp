@@ -76,7 +76,6 @@ AllToAllIntraNode::AllToAllIntraNode(
     }
 
     auto dstHandlesHost = distributed->allToAll(srcHandlesHost);
-
     for (unsigned i = 0; i < worldSize; i++) {
       auto &ptr = recvBuffers.emplace_back();
       if (i == rank) {
@@ -94,6 +93,31 @@ AllToAllIntraNode::AllToAllIntraNode(
 
     CUDACHECK(cudaMemcpy(
         recvBuffersPtr, recvBuffers.data(), sizeof(std::byte *) * worldSize, cudaMemcpyHostToDevice
+    ));
+  }
+
+  // Allocate the local buffer for dispatch counts.
+  CUDACHECK(cudaMalloc(&localRecvCountPtr, sizeof(uint32_t) * maxNumTokens));
+  CUDACHECK(cudaMemset(localRecvCountPtr, 0, sizeof(uint32_t) * maxNumTokens));
+  CUDACHECK(cudaMalloc(&countBuffersPtr, sizeof(uint32_t *) * worldSize));
+  {
+    cudaIpcMemHandle_t countHandle;
+    CUDACHECK(cudaIpcGetMemHandle(&countHandle, localRecvCountPtr));
+    auto countHandlesHost = distributed->allGather(countHandle);
+
+    countBuffers.resize(worldSize);
+    for (unsigned i = 0; i < worldSize; i++) {
+      if (i == rank) {
+        countBuffers[i] = localRecvCountPtr;
+      } else {
+        CUDACHECK(cudaIpcOpenMemHandle(
+            (void **)&countBuffers[i], countHandlesHost[i], cudaIpcMemLazyEnablePeerAccess
+        ));
+      }
+    }
+
+    CUDACHECK(cudaMemcpy(
+        countBuffersPtr, countBuffers.data(), sizeof(uint32_t *) * worldSize, cudaMemcpyHostToDevice
     ));
   }
 
@@ -117,11 +141,15 @@ AllToAllIntraNode::~AllToAllIntraNode() {
     CUDACHECK(cudaFree(sendBuffers[i]));
     if (i != rank) {
       CUDACHECK(cudaIpcCloseMemHandle(recvBuffers[i]));
+      CUDACHECK(cudaIpcCloseMemHandle(countBuffers[i]));
     }
   }
 
   CUDACHECK(cudaFree(recvBuffersPtr));
   CUDACHECK(cudaFree(sendBuffersPtr));
+  CUDACHECK(cudaFree(countBuffersPtr));
+  CUDACHECK(cudaFree(localRecvCountPtr));
+
   CUDACHECK(cudaFree(tokenCount));
   CUDACHECK(cudaFree(numTokensPerRank));
 

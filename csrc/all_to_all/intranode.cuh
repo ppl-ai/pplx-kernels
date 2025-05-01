@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/device_utils.h"
+#include "core/device_utils.cuh"
 
 #include <cstdint>
 
@@ -52,7 +52,7 @@ private:
 
   __device__ __forceinline__ std::byte *getBaseTokenPtr(unsigned rank) {
     return getBaseCounterPtr(rank) +
-           device::round_up<size_t>(numLocalExperts * sizeof(uint32_t), sizeof(int4));
+           round_up<size_t>(numLocalExperts * sizeof(uint32_t), sizeof(int4));
   }
 
 private:

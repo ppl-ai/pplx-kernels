@@ -29,14 +29,14 @@ AllToAll::AllToAll(
       dpSize(dpSize),
       numSMs(get_sm_count()) {
 
-  ROSE_ASSERT(hiddenDimBytes % 16 == 0, "invalid hidden dim bytes");
-  ROSE_ASSERT(hiddenDimScaleBytes % 16 == 0, "invalid hidden dim scale bytes");
+  PPLX_ASSERT(hiddenDimBytes % 16 == 0, "invalid hidden dim bytes");
+  PPLX_ASSERT(hiddenDimScaleBytes % 16 == 0, "invalid hidden dim scale bytes");
   const size_t perTokenBytes =
       round_up<size_t>(hiddenDimBytes + hiddenDimScaleBytes + sizeof(uint32_t), 16);
 
-  ROSE_ASSERT(numLocalExperts != 0, "numLocalExperts is 0");
-  ROSE_ASSERT(numDPGroups > 1, "at least 2 DP groups are required");
-  ROSE_ASSERT(hiddenDimScaleBytes <= hiddenDimBytes, "invalid hidden dim bytes");
+  PPLX_ASSERT(numLocalExperts != 0, "numLocalExperts is 0");
+  PPLX_ASSERT(numDPGroups > 1, "at least 2 DP groups are required");
+  PPLX_ASSERT(hiddenDimScaleBytes <= hiddenDimBytes, "invalid hidden dim bytes");
 }
 
 AllToAll::~AllToAll() {}

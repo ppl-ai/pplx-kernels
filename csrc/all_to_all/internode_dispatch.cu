@@ -4,7 +4,7 @@
 #include <nvtx3/nvToolsExt.h>
 
 #include "all_to_all/internode.h"
-#include "core/device_utils.h"
+#include "core/device_utils.cuh"
 #include "core/utils.h"
 
 using namespace pplx;
@@ -58,16 +58,15 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
   const unsigned dpGroup = rank / dpSize;
   const unsigned dpRank = rank % dpSize;
   const unsigned tokenDim = hiddenDim + hiddenDimScale;
-  const unsigned tokenStride =
-      device::round_up<unsigned>(tokenDim + sizeof(uint32_t), sizeof(int4));
+  const unsigned tokenStride = round_up<unsigned>(tokenDim + sizeof(uint32_t), sizeof(int4));
   const unsigned WARP_SIZE = 32;
   const unsigned warpId = threadIdx.x / WARP_SIZE;
   const unsigned laneId = threadIdx.x % WARP_SIZE;
 
   // Determine the number of tokens populated which are to be sent.
   const unsigned numSendTokens = boundM ? __ldg(boundM) : m;
-  ROSE_DEVICE_ASSERT(numSendTokens <= maxNumTokens);
-  ROSE_DEVICE_ASSERT(
+  PPLX_DEVICE_ASSERT(numSendTokens <= maxNumTokens);
+  PPLX_DEVICE_ASSERT(
       hiddenDimScale == 0 || numSendTokens == 0 || (expertXScale != nullptr && dpXScale != nullptr)
   );
 
@@ -170,14 +169,14 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
     }
 
     if (DO_RECV) {
-      __syncthreads();
+      cooperative_groups::this_grid().sync();
     }
   }
 
   if constexpr (DO_RECV) {
     // Wait for the token counts to be sent.
     const size_t numExpertsAndGroups = numLocalExperts * numDPGroups;
-    const size_t expertsPerBlock = device::ceil_div<size_t>(numExpertsAndGroups, gridDim.x);
+    const size_t expertsPerBlock = ceil_div<size_t>(numExpertsAndGroups, gridDim.x);
     uint32_t *sharedExpert = reinterpret_cast<uint32_t *>(sharedMemory);
     uint32_t *sharedToken = sharedExpert + expertsPerBlock;
 
@@ -353,7 +352,7 @@ void AllToAllInterNode::dispatch(
     ));
     break;
   default:
-    ROSE_UNREACHABLE("invalid split mode");
+    PPLX_UNREACHABLE("invalid split mode");
   }
   nvtxRangePop();
 }

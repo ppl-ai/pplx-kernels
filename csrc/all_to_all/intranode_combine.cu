@@ -1,6 +1,6 @@
 #include "all_to_all/intranode.cuh"
 #include "core/atomic.cuh"
-#include "core/device_utils.h"
+#include "core/device_utils.cuh"
 #include "core/utils.h"
 #include "intranode.h"
 
@@ -41,26 +41,36 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
     const uint32_t *sourceIndex,
     const uint32_t *sourceOffset,
     const uint32_t *sourceRank,
+    uint32_t *localCount,
+    uint32_t **remoteCount,
     uint32_t &globalTokenIndex
 ) {
   const unsigned numLocalExperts = numExperts / worldSize;
   const size_t tokenDim = hiddenDim * sizeof(T);
-  const size_t tokenStride = device::round_up<size_t>(tokenDim, sizeof(int4));
+  const size_t tokenStride = round_up<size_t>(tokenDim, sizeof(int4));
   constexpr unsigned WARP_SIZE = 32;
   uint32_t warpId = threadIdx.x / WARP_SIZE;
   const unsigned laneId = threadIdx.x % WARP_SIZE;
 
-  BufferWrapper remoteBuffer(recvBuffersPtr, numLocalExperts, worldSize, maxNumTokens, tokenStride);
   BufferWrapper localBuffer(sendBuffersPtr, numLocalExperts, worldSize, maxNumTokens, tokenStride);
+  BufferWrapper remoteBuffer(recvBuffersPtr, numLocalExperts, worldSize, maxNumTokens, tokenStride);
 
   if (DO_SEND) {
-    size_t numSendTokens = globalTokenIndex;
+    const size_t numSendTokens = globalTokenIndex;
+
+    // Wait for the dispatch step to finish.
+    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
+         i += blockDim.x * gridDim.x) {
+      auto *pollPtr = &localBuffer.getDispatchSyncPtr(i);
+      while (ld_flag_volatile(pollPtr) != 0)
+        ;
+    }
+    cooperative_groups::this_grid().sync();
 
     for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
          i += blockDim.x * gridDim.x) {
-      while (ld_flag_volatile(&localBuffer.getDispatchSyncPtr(i)) != 0)
-        ;
       st_flag_volatile(&remoteBuffer.getCombineSyncPtr(i), 1);
+      st_flag_volatile(&remoteBuffer.getCountPtr(i, 0), 1);
     }
 
     // Dispatch the tokens from the expert to the DP groups.
@@ -77,53 +87,57 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
 
       auto copy = [&](unsigned rank, unsigned start, unsigned step) {
         std::byte *buffer = remoteBuffer.getTokenPtr(rank, dstLocalExpert, index);
-        float4 *srcPtr = (float4 *)source;
-        float4 *dstPtr = (float4 *)buffer;
+        const int4 *srcPtr = (const int4 *)source;
+        int4 *dstPtr = (int4 *)buffer;
 
         srcPtr += start;
         dstPtr += start;
 
-#pragma unroll(4)
         for (unsigned j = start; j < n; j += step) {
-          *dstPtr = *srcPtr;
+          *dstPtr = __ldg(srcPtr);
           dstPtr += step;
           srcPtr += step;
         }
       };
 
+      // Copy to the destination. Use the entire block if DP size is 1.
       if (dpSize == 1) {
         copy(rank, threadIdx.x, blockDim.x);
+        __syncthreads();
       } else {
         for (unsigned i = warpId; i < dpSize; i += NUM_WARPS) {
           copy((rank / dpSize) * dpSize + i, laneId, WARP_SIZE);
         }
       }
+
+      // Signal the completion of the copy.
+      for (unsigned i = threadIdx.x; i < dpSize; i += blockDim.x) {
+        const unsigned dstRank = (rank / dpSize) * dpSize + i;
+        add_flag_release(&remoteCount[dstRank][index], 1);
+      }
     }
 
-    cooperative_groups::this_grid().sync();
-
-    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
-         i += blockDim.x * gridDim.x) {
-      st_flag_release(&remoteBuffer.getCountPtr(i, 0), 1);
+    if (DO_SEND) {
+      cooperative_groups::this_grid().sync();
     }
   }
 
   // Synchronize the grid to ensure that tokens routed within the rank are
   // correctly transported from one block to another.
   if (DO_RECV) {
-    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
-         i += blockDim.x * gridDim.x) {
-      while (ld_flag_acquire(&localBuffer.getCountPtr(i, 0)) == 0)
-        ;
-      st_flag_volatile(&localBuffer.getCountPtr(i, 0), 0);
-    }
-
-    cooperative_groups::this_grid().sync();
+    // Reset the token count here, after a barrier ensures that nobody needs it.
     globalTokenIndex = 0;
 
     // Compute the weighed sum of the input tokens.
     const size_t numRecvTokens = boundM ? __ldg(boundM) : m;
     for (unsigned i = blockIdx.x; i < numRecvTokens; i += gridDim.x) {
+      if (threadIdx.x == 0) {
+        while (ld_flag_acquire(&localCount[i]) != expertsPerToken)
+          ;
+        localCount[i] = 0;
+      }
+      __syncthreads();
+
       U *dstPtr = outTokens + i * outTokensStrideElem;
       constexpr unsigned VEC_SIZE = 8;
       for (unsigned j = threadIdx.x * VEC_SIZE; j < hiddenDim; j += blockDim.x * VEC_SIZE) {
@@ -154,6 +168,17 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void combineKernel(
       }
     }
 
+    // Wait for all the other ranks to at least start combine.
+    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
+         i += blockDim.x * gridDim.x) {
+      auto *pollPtr = &localBuffer.getCountPtr(i, 0);
+      while (ld_flag_volatile(pollPtr) != 1)
+        ;
+      st_flag_volatile(pollPtr, 0);
+    }
+
+    // Signal that the current device has finished combine.
+    cooperative_groups::this_grid().sync();
     for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
          i += blockDim.x * gridDim.x) {
       st_flag_volatile(&remoteBuffer.getCombineSyncPtr(i), 0);
@@ -212,6 +237,8 @@ void AllToAllIntraNode::combine(
       &sourceIndex,
       &sourceOffset,
       &sourceRank,
+      &localRecvCountPtr,
+      &countBuffersPtr,
       &tokenIndex,
   };
 
@@ -233,7 +260,7 @@ void AllToAllIntraNode::combine(
     ));
     break;
   default:
-    ROSE_UNREACHABLE("invalid split mode");
+    PPLX_UNREACHABLE("invalid split mode");
   }
   nvtxRangePop();
 }

@@ -1,4 +1,3 @@
-#include "all_to_all_ops.h"
 #include "all_to_all/internode.h"
 #include "all_to_all/intranode.h"
 #include "core/distributed.h"
@@ -26,7 +25,8 @@ namespace {
 class DistributedTorch : public Distributed {
 public:
   DistributedTorch(const c10::intrusive_ptr<c10d::ProcessGroup> &group)
-      : group(group) {}
+      : Distributed(group->getRank(), group->getSize()),
+        group(group) {}
 
 private:
   void allToAllImpl(const void *input, void *output, size_t size, size_t count) override {
@@ -289,7 +289,8 @@ void combine(
 
 } // namespace
 
-void pplx::register_all_to_all_ops(torch::Library &m) {
+namespace pplx {
+void register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_destroy", &destroy);
 
   m.def("all_to_all_internode_create", &create_internode);
@@ -300,3 +301,4 @@ void pplx::register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_intranode_dispatch", &dispatch<AllToAllIntraNode>);
   m.def("all_to_all_intranode_combine", &combine<AllToAllIntraNode>);
 }
+} // namespace pplx

@@ -1,9 +1,11 @@
 #pragma once
 
-#define ROSE_ENABLE_DEVICE_ASSERT 1
+#include "core/common_utils.h"
 
-#ifdef ROSE_ENABLE_DEVICE_ASSERT
-#define ROSE_DEVICE_ASSERT(cond)                                                                   \
+#define PPLX_ENABLE_DEVICE_ASSERT 0
+
+#if PPLX_ENABLE_DEVICE_ASSERT == 1
+#define PPLX_DEVICE_ASSERT(cond)                                                                   \
   do {                                                                                             \
     if (!(cond)) {                                                                                 \
       printf("Assertion failed (%s:%d): %s\n", __FILE__, __LINE__, #cond);                         \
@@ -11,11 +13,22 @@
     }                                                                                              \
   } while (0)
 #else
-#define ROSE_DEVICE_ASSERT(cond)
+#define PPLX_DEVICE_ASSERT(cond)
 #endif
 
 namespace pplx {
 namespace device {
+
+// A wrapper for the kernels that is used to guard against compilation on
+// architectures that will never use the kernel.
+template <typename Kernel> struct enable_sm90_or_later : Kernel {
+  template <typename... Args> __device__ void operator()(Args &&...args) {
+#if defined __CUDA_ARCH__ && __CUDA_ARCH__ >= 900
+    Kernel::operator()(std::forward<Args>(args)...);
+#endif
+  }
+};
+
 __forceinline__ __device__ unsigned warp_sum(unsigned value) {
   value += __shfl_xor_sync(0xffffffff, value, 16);
   value += __shfl_xor_sync(0xffffffff, value, 8);
@@ -42,10 +55,6 @@ __forceinline__ __device__ float half_warp_reduce_max(float value) {
   value = max(value, __shfl_xor_sync(mask, value, 1));
   return value;
 }
-
-template <typename T> __device__ T ceil_div(T x, T y) { return (x + y - 1) / y; }
-
-template <typename T> __device__ T round_up(T x, T y) { return ceil_div<T>(x, y) * y; }
 
 } // namespace device
 } // namespace pplx

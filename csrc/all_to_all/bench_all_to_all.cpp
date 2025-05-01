@@ -16,6 +16,7 @@
 #include <nvshmemx.h>
 #include <nvtx3/nvToolsExt.h>
 
+#include <array>
 #include <iomanip>
 #include <iostream>
 

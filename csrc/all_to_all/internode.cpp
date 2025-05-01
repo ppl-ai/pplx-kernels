@@ -36,36 +36,36 @@ AllToAllInterNode::AllToAllInterNode(
   numTokensPerDP = mallocZeroBuffer<uint32_t>(numLocalExperts * numDPGroups);
 
   numTokensBuffer = (uint64_t *)nvshmem_malloc(sizeof(uint64_t) * numLocalExperts * numDPGroups);
-  ROSE_ASSERT(numTokensBuffer != nullptr, "failed to allocate numTokensBuffer");
+  PPLX_ASSERT(numTokensBuffer != nullptr, "failed to allocate numTokensBuffer");
   cudaMemset(numTokensBuffer, 0, sizeof(uint64_t) * numLocalExperts * numDPGroups);
 
   numDispatchRecvBuffer =
       (uint64_t *)nvshmem_malloc(sizeof(uint64_t) * numLocalExperts * numDPGroups);
-  ROSE_ASSERT(numDispatchRecvBuffer != nullptr, "failed to allocate numDispatchRecvBuffer");
+  PPLX_ASSERT(numDispatchRecvBuffer != nullptr, "failed to allocate numDispatchRecvBuffer");
   cudaMemset(numDispatchRecvBuffer, 0, sizeof(uint64_t) * numLocalExperts * numDPGroups);
 
   combineSignalBuffer = (uint64_t *)nvshmem_malloc(sizeof(uint64_t) * maxNumTokens);
-  ROSE_ASSERT(combineSignalBuffer != nullptr, "failed to allocate combineSignalBuffer");
+  PPLX_ASSERT(combineSignalBuffer != nullptr, "failed to allocate combineSignalBuffer");
   cudaMemset(combineSignalBuffer, 0, sizeof(uint64_t) * maxNumTokens);
 
   combineSyncBuffer = (uint64_t *)nvshmem_malloc(sizeof(uint64_t) * worldSize);
-  ROSE_ASSERT(combineSyncBuffer != nullptr, "failed to allocate combineSyncBuffer");
+  PPLX_ASSERT(combineSyncBuffer != nullptr, "failed to allocate combineSyncBuffer");
   cudaMemset(combineSyncBuffer, 0, sizeof(uint64_t) * worldSize);
 
   // Buffers for dispatch.
   const size_t perTokenBytes =
       round_up<size_t>(hiddenDimBytes + hiddenDimScaleBytes + sizeof(uint32_t), 16);
   xDispatchIn = (std::byte *)nvshmem_malloc(maxNumTokens * perTokenBytes);
-  ROSE_ASSERT(xDispatchIn != nullptr, "failed to allocate xDispatchIn");
+  PPLX_ASSERT(xDispatchIn != nullptr, "failed to allocate xDispatchIn");
   xDispatchOut = (std::byte *)nvshmem_malloc(maxBatchTokens * perTokenBytes);
-  ROSE_ASSERT(xDispatchOut != nullptr, "failed to allocate xDispatchOut");
+  PPLX_ASSERT(xDispatchOut != nullptr, "failed to allocate xDispatchOut");
 
   // Buffers for combine. The allocations are a bit wider to accommodate all
   // possible data types (primarily float for testing and bfloat16 for prod).
   xCombineIn = (std::byte *)nvshmem_malloc(maxBatchTokens * hiddenDim * sizeof(float));
-  ROSE_ASSERT(xCombineIn != nullptr, "failed to allocate xCombineIn");
+  PPLX_ASSERT(xCombineIn != nullptr, "failed to allocate xCombineIn");
   xCombineOut = (std::byte *)nvshmem_malloc(maxNumTokens * numExperts * hiddenDim * sizeof(float));
-  ROSE_ASSERT(xCombineOut != nullptr, "failed to allocate xCombineOut");
+  PPLX_ASSERT(xCombineOut != nullptr, "failed to allocate xCombineOut");
 
   // Buffers for token tracking.
   sourceIndex = mallocZeroBuffer<uint32_t>(maxBatchTokens);

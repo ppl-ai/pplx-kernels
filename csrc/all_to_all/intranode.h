@@ -66,22 +66,26 @@ private:
   /// @section Peer-to-Peer shared buffers.
   std::vector<std::byte *> sendBuffers;
   std::byte **sendBuffersPtr;
-
   std::vector<std::byte *> recvBuffers;
   std::byte **recvBuffersPtr;
 
+  /// Buffer to synchronize multiple senders with a receiver in dispatch.
+  uint32_t *localRecvCountPtr;
+  std::vector<uint32_t *> countBuffers;
+  uint32_t **countBuffersPtr;
+
   /// @section Global buffers for use within kernels.
-  uint32_t *numTokensPerRank = nullptr;
-  uint32_t *tokenCount = nullptr;
+  uint32_t *numTokensPerRank;
+  uint32_t *tokenCount;
 
   /// @section Internal buffers communicating between dispatch and combine.
-  uint32_t *sourceIndex = nullptr;
-  uint32_t *sourceExpert = nullptr;
-  uint32_t *sourceOffset = nullptr;
-  uint32_t *sourceRank = nullptr;
-  uint32_t *sourceToken = nullptr;
-  uint32_t *sourceRoute = nullptr;
-  uint32_t *tokenIndex = nullptr;
+  uint32_t *sourceIndex;
+  uint32_t *sourceExpert;
+  uint32_t *sourceOffset;
+  uint32_t *sourceRank;
+  uint32_t *sourceToken;
+  uint32_t *sourceRoute;
+  uint32_t *tokenIndex;
 };
 
 } // namespace pplx

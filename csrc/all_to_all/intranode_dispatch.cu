@@ -1,6 +1,6 @@
 #include "all_to_all/intranode.cuh"
 #include "core/atomic.cuh"
-#include "core/device_utils.h"
+#include "core/device_utils.cuh"
 #include "core/utils.h"
 #include "intranode.h"
 
@@ -55,37 +55,42 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
   extern __shared__ std::byte sharedMemory[];
 
   // Determine the rank, DP rank and per-rank constants.
-  const unsigned numLocalExperts = numExperts / worldSize;
+  const size_t numLocalExperts = numExperts / worldSize;
   const unsigned dpRank = rank % dpSize;
-  const unsigned tokenDim = hiddenDim + hiddenDimScale;
-  const unsigned tokenStride =
-      device::round_up<unsigned>(tokenDim + sizeof(uint32_t), sizeof(int4));
+  const size_t tokenDim = hiddenDim + hiddenDimScale;
+  const size_t tokenStride = round_up<size_t>(tokenDim + sizeof(uint32_t), sizeof(int4));
 
   // Determine the number of tokens populated which are to be sent.
   const unsigned numSendTokens = boundM ? __ldg(boundM) : m;
-  ROSE_DEVICE_ASSERT(numSendTokens <= maxNumTokens);
-  ROSE_DEVICE_ASSERT(
+  PPLX_DEVICE_ASSERT(numSendTokens <= maxNumTokens);
+  PPLX_DEVICE_ASSERT(
       hiddenDimScale == 0 || numSendTokens == 0 || (expertXScale != nullptr && dpXScale != nullptr)
   );
-  ROSE_DEVICE_ASSERT(tokenStride % sizeof(int4) == 0);
+  PPLX_DEVICE_ASSERT(tokenStride % sizeof(int4) == 0);
 
   BufferWrapper localBuffer(sendBuffersPtr, numLocalExperts, worldSize, maxNumTokens, tokenStride);
   BufferWrapper remoteBuffer(recvBuffersPtr, numLocalExperts, worldSize, maxNumTokens, tokenStride);
 
   // Create wrappers around the send/recv buffers.
   if constexpr (DO_SEND) {
-    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
-         i += blockDim.x * gridDim.x) {
-      while (ld_flag_volatile(&localBuffer.getCombineSyncPtr(i)) != 0)
-        ;
-      st_flag_volatile(&remoteBuffer.getDispatchSyncPtr(i), 1);
-    }
-
     // Clear some output buffers.
     if (blockIdx.x == 0) {
       for (unsigned i = threadIdx.x; i < numLocalExperts; i += blockDim.x) {
         outNumTokensPerExpert[i] = 0;
       }
+    }
+
+    // Wait for the combine step to finish.
+    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
+         i += blockDim.x * gridDim.x) {
+      auto *pollPtr = &localBuffer.getCombineSyncPtr(i);
+      while (ld_flag_volatile(pollPtr) != 0)
+        ;
+    }
+    cooperative_groups::this_grid().sync();
+    for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
+         i += blockDim.x * gridDim.x) {
+      st_flag_volatile(&remoteBuffer.getDispatchSyncPtr(i), 1);
     }
 
     // Copy the token to shared memory, then to the remote buffers.
@@ -140,22 +145,37 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
 
         // Copy the token to the shared buffer.
         std::byte *buffer = remoteBuffer.getTokenPtr(dstRank, dstLocalExpert, index);
-        uint32_t *metaPtr = (uint32_t *)(buffer + tokenDim);
+        if (laneId == 0) {
+          *((uint32_t *)(buffer + tokenDim)) = i;
+        }
+
+        const unsigned n = tokenDim / sizeof(int4);
         int4 *dstPtr = (int4 *)buffer;
         int4 *srcPtr = (int4 *)sharedTokenPtr;
         dstPtr += laneId;
         srcPtr += laneId;
-        const unsigned n = tokenStride / sizeof(int4);
 
-#pragma unroll(4)
-        for (unsigned d = laneId; d < n; d += WARP_SIZE) {
+        unsigned d = laneId;
+        while (d + 4 * WARP_SIZE < n) {
+          int4 r[4];
+#pragma unroll
+          for (unsigned i = 0; i < 4; i++) {
+            r[i] = *srcPtr;
+            srcPtr += WARP_SIZE;
+          }
+#pragma unroll
+          for (unsigned i = 0; i < 4; i++) {
+            *dstPtr = r[i];
+            dstPtr += WARP_SIZE;
+          }
+          d += WARP_SIZE * 4;
+        }
+
+        while (d < n) {
           *dstPtr = *srcPtr;
           dstPtr += WARP_SIZE;
           srcPtr += WARP_SIZE;
-        }
-
-        if (laneId == 0) {
-          metaPtr[0] = i;
+          d += WARP_SIZE;
         }
       }
     }
@@ -176,7 +196,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
   if constexpr (DO_RECV) {
     // Wait for the token counts to be sent.
     const size_t numExpertsAndRanks = numLocalExperts * worldSize;
-    const size_t expertsPerBlock = device::ceil_div<size_t>(numExpertsAndRanks, gridDim.x);
+    const size_t expertsPerBlock = ceil_div<size_t>(numExpertsAndRanks, gridDim.x);
     uint32_t *sharedExpert = reinterpret_cast<uint32_t *>(sharedMemory);
     uint32_t *sharedToken = sharedExpert + expertsPerBlock;
 
@@ -189,10 +209,11 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
       const uint32_t srcLocalExpert = group % numLocalExperts;
 
       // Fetch the token counts from all incoming ranks.
+      auto *counterPtr = &localBuffer.getCountPtr(srcRank, srcLocalExpert);
       uint32_t counter;
-      while ((counter = ld_flag_acquire(&localBuffer.getCountPtr(srcRank, srcLocalExpert))) == 0)
+      while ((counter = ld_flag_acquire(counterPtr)) == 0)
         ;
-      localBuffer.getCountPtr(srcRank, srcLocalExpert) = 0;
+      st_flag_volatile(counterPtr, 0);
 
       size_t numTokens = counter - 1;
       numTokensPerRank[group] = numTokens;
@@ -225,6 +246,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
     }
 
     cooperative_groups::this_grid().sync();
+
     unsigned numRecvTokens = globalTokenIndex;
 
     for (unsigned i = blockIdx.x; i < numRecvTokens; i += gridDim.x) {
@@ -252,6 +274,8 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
       }
     }
 
+    // Signal that the current device has finished dispatching tokens.
+    cooperative_groups::this_grid().sync();
     for (unsigned i = blockIdx.x * blockDim.x + threadIdx.x; i < worldSize;
          i += blockDim.x * gridDim.x) {
       st_flag_volatile(&remoteBuffer.getDispatchSyncPtr(i), 0);
@@ -360,7 +384,7 @@ void AllToAllIntraNode::dispatch(
     ));
     break;
   default:
-    ROSE_UNREACHABLE("invalid split mode");
+    PPLX_UNREACHABLE("invalid split mode");
   }
   nvtxRangePop();
 }

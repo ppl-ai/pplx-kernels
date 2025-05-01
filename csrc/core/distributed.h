@@ -8,7 +8,7 @@ namespace pplx {
 
 class Distributed {
 public:
-  Distributed();
+  Distributed(unsigned rank, unsigned worldSize);
 
   virtual ~Distributed();
 
@@ -18,8 +18,17 @@ public:
     return output;
   }
 
+  template <typename T> std::vector<T> allGather(const T &input) {
+    std::vector<T> tmp(worldSize, input);
+    return allToAll(tmp);
+  }
+
 protected:
   virtual void allToAllImpl(const void *input, void *output, size_t size, size_t count) = 0;
+
+protected:
+  unsigned rank;
+  unsigned worldSize;
 };
 
 class DistributedNVSHMEM final : public Distributed {
@@ -28,10 +37,6 @@ public:
 
 private:
   void allToAllImpl(const void *input, void *output, size_t size, size_t count) override;
-
-private:
-  unsigned rank;
-  unsigned worldSize;
 };
 
 } // namespace pplx
