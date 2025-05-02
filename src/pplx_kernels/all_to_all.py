@@ -97,6 +97,7 @@ class AllToAll:
         hidden_dim_bytes: int,
         hidden_dim_scale_bytes: int,
         group_name: str = "default",
+        max_sm_count: int = 0,
     ) -> "AllToAll":
         assert world_size % dp_size == 0
         assert world_size // dp_size > 1
@@ -114,6 +115,7 @@ class AllToAll:
             hidden_dim_bytes,
             hidden_dim_scale_bytes,
             group_name,
+            max_sm_count,
         )
         assert ptr != 0
 
@@ -136,6 +138,7 @@ class AllToAll:
         hidden_dim: int,
         hidden_dim_bytes: int,
         hidden_dim_scale_bytes: int,
+        max_sm_count: int = 0,
     ) -> "AllToAll":
         assert world_size % dp_size == 0
         assert world_size // dp_size > 1
@@ -152,6 +155,7 @@ class AllToAll:
             hidden_dim,
             hidden_dim_bytes,
             hidden_dim_scale_bytes,
+            max_sm_count,
         )
         assert ptr != 0
 
