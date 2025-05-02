@@ -35,7 +35,8 @@ public:
       unsigned dpSize,
       size_t hiddenDim,
       size_t hiddenDimBytes,
-      size_t hiddenDimScaleBytes
+      size_t hiddenDimScaleBytes,
+      int max_sm_count = 0
   );
 
   virtual ~AllToAll();
