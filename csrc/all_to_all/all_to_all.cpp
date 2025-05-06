@@ -14,7 +14,8 @@ AllToAll::AllToAll(
     unsigned dpSize,
     size_t hiddenDim,
     size_t hiddenDimBytes,
-    size_t hiddenDimScaleBytes
+    size_t hiddenDimScaleBytes,
+    int max_sm_count
 )
     : maxNumTokens(maxNumTokens),
       numExperts(numExperts),
@@ -27,7 +28,7 @@ AllToAll::AllToAll(
       rank(rank),
       worldSize(worldSize),
       dpSize(dpSize),
-      numSMs(get_sm_count()) {
+      numSMs(max_sm_count > 0 ? max_sm_count : get_sm_count()) {
 
   PPLX_ASSERT(hiddenDimBytes % 16 == 0, "invalid hidden dim bytes");
   PPLX_ASSERT(hiddenDimScaleBytes % 16 == 0, "invalid hidden dim scale bytes");
