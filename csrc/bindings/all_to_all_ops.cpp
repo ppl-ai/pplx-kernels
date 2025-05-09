@@ -294,11 +294,59 @@ void register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_destroy", &destroy);
 
   m.def("all_to_all_internode_create", &create_internode);
-  m.def("all_to_all_internode_dispatch", &dispatch<AllToAllInterNode>);
-  m.def("all_to_all_internode_combine", &combine<AllToAllInterNode>);
+
+  m.def("all_to_all_internode_dispatch("
+        "  int self,"
+        "  Tensor! out_expert_num_tokens,"
+        "  Tensor! out_expert_x,"
+        "  Tensor!? out_expert_x_scale,"
+        "  Tensor dp_x,"
+        "  Tensor? dp_x_scale,"
+        "  Tensor indices,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()",
+        &dispatch<AllToAllInterNode>);
+
+  m.def("all_to_all_internode_combine("
+        "  int self,"
+        "  Tensor! out_tokens,"
+        "  Tensor indices,"
+        "  Tensor weights,"
+        "  Tensor expert_y,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()",
+        &combine<AllToAllInterNode>);
 
   m.def("all_to_all_intranode_create", &create_intranode);
-  m.def("all_to_all_intranode_dispatch", &dispatch<AllToAllIntraNode>);
-  m.def("all_to_all_intranode_combine", &combine<AllToAllIntraNode>);
+
+  m.def("all_to_all_intranode_dispatch("
+        "  int self,"
+        "  Tensor! out_expert_num_tokens,"
+        "  Tensor! out_expert_x,"
+        "  Tensor!? out_expert_x_scale,"
+        "  Tensor dp_x,"
+        "  Tensor? dp_x_scale,"
+        "  Tensor indices,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()",
+        &dispatch<AllToAllIntraNode>);
+
+  m.def("all_to_all_intranode_combine("
+        "  int self,"
+        "  Tensor! out_tokens,"
+        "  Tensor indices,"
+        "  Tensor weights,"
+        "  Tensor expert_y,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()",
+        &combine<AllToAllIntraNode>);
 }
 } // namespace pplx

@@ -91,5 +91,5 @@ void pplx::register_nvshmem_ops(torch::Library &m) {
   m.def("nvshmem_malloc", &malloc_tensor);
   m.def("nvshmem_barrier_all", &barrier_all);
   m.def("nvshmem_barrier_all_on_current_stream", &barrier_all_on_current_stream);
-  m.def("nvshmem_alltoall", &alltoall);
+  m.def("nvshmem_alltoall(Tensor! dest, Tensor src) -> ()", &alltoall);
 }
