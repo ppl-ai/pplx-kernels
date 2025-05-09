@@ -185,6 +185,19 @@ void dispatch(
   );
 }
 
+void fake_dispatch(
+    fptr_t ptr,
+    at::Tensor &outExpertNumTokens,
+    at::Tensor &outExpertX,
+    const std::optional<at::Tensor> &outExpertXScale,
+    const at::Tensor &dpX,
+    const std::optional<at::Tensor> &dpXScale,
+    const at::Tensor &indices,
+    const std::optional<at::Tensor> &boundM,
+    bool doSend,
+    bool doRecv
+) {}
+
 template <typename Kernel, typename T, typename U>
 void combineImpl(
     Kernel *all_to_all,
@@ -285,6 +298,17 @@ void combine(
   }
 }
 
+void fake_combine(
+    fptr_t ptr,
+    at::Tensor &outTokens,
+    const at::Tensor &indices,
+    const at::Tensor &weights,
+    const at::Tensor &expertY,
+    const std::optional<at::Tensor> &boundM,
+    bool doSend,
+    bool doRecv
+) {}
+
 #undef _CHECK_TENSOR
 
 } // namespace
@@ -294,11 +318,64 @@ void register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_destroy", &destroy);
 
   m.def("all_to_all_internode_create", &create_internode);
-  m.def("all_to_all_internode_dispatch", &dispatch<AllToAllInterNode>);
-  m.def("all_to_all_internode_combine", &combine<AllToAllInterNode>);
+
+  m.def("all_to_all_internode_dispatch("
+        "  int self,"
+        "  Tensor! out_expert_num_tokens,"
+        "  Tensor! out_expert_x,"
+        "  Tensor!? out_expert_x_scale,"
+        "  Tensor dp_x,"
+        "  Tensor? dp_x_scale,"
+        "  Tensor indices,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()");
+  m.impl("all_to_all_internode_dispatch", c10::kCUDA, &dispatch<AllToAllInterNode>);
+  m.impl("all_to_all_internode_dispatch", c10::kMeta, &fake_dispatch);
+
+  m.def("all_to_all_internode_combine("
+        "  int self,"
+        "  Tensor! out_tokens,"
+        "  Tensor indices,"
+        "  Tensor weights,"
+        "  Tensor expert_y,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()");
+  m.impl("all_to_all_internode_combine", c10::kCUDA, &combine<AllToAllInterNode>);
+  m.impl("all_to_all_internode_combine", c10::kMeta, &fake_combine);
 
   m.def("all_to_all_intranode_create", &create_intranode);
-  m.def("all_to_all_intranode_dispatch", &dispatch<AllToAllIntraNode>);
-  m.def("all_to_all_intranode_combine", &combine<AllToAllIntraNode>);
+
+  m.def("all_to_all_intranode_dispatch("
+        "  int self,"
+        "  Tensor! out_expert_num_tokens,"
+        "  Tensor! out_expert_x,"
+        "  Tensor!? out_expert_x_scale,"
+        "  Tensor dp_x,"
+        "  Tensor? dp_x_scale,"
+        "  Tensor indices,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()");
+  m.impl("all_to_all_intranode_dispatch", c10::kCUDA, &dispatch<AllToAllIntraNode>);
+  m.impl("all_to_all_intranode_dispatch", c10::kMeta, &fake_dispatch);
+
+  m.def("all_to_all_intranode_combine("
+        "  int self,"
+        "  Tensor! out_tokens,"
+        "  Tensor indices,"
+        "  Tensor weights,"
+        "  Tensor expert_y,"
+        "  Tensor? bound_m,"
+        "  bool do_send,"
+        "  bool do_recv"
+        ") -> ()");
+  m.impl("all_to_all_intranode_combine", c10::kCUDA, &combine<AllToAllIntraNode>);
+  m.impl("all_to_all_intranode_combine", c10::kMeta, &fake_combine);
 }
+
 } // namespace pplx
