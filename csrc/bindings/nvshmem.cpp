@@ -79,6 +79,9 @@ void alltoall(at::Tensor dest, at::Tensor source) {
   ));
 }
 
+void fake_alltoall(at::Tensor dest, at::Tensor source) {
+}
+
 } // namespace
 
 void pplx::register_nvshmem_ops(torch::Library &m) {
@@ -91,5 +94,7 @@ void pplx::register_nvshmem_ops(torch::Library &m) {
   m.def("nvshmem_malloc", &malloc_tensor);
   m.def("nvshmem_barrier_all", &barrier_all);
   m.def("nvshmem_barrier_all_on_current_stream", &barrier_all_on_current_stream);
-  m.def("nvshmem_alltoall(Tensor! dest, Tensor src) -> ()", &alltoall);
+  m.def("nvshmem_alltoall(Tensor! dest, Tensor src) -> ()");
+  m.impl("nvshmem_alltoall", c10::kCUDA, &alltoall);
+  m.impl("nvshmem_alltoall", c10::kMeta, &fake_alltoall);
 }
