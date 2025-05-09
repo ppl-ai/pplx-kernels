@@ -79,8 +79,7 @@ void alltoall(at::Tensor dest, at::Tensor source) {
   ));
 }
 
-void fake_alltoall(at::Tensor dest, at::Tensor source) {
-}
+void fake_alltoall(at::Tensor dest, at::Tensor source) {}
 
 } // namespace
 

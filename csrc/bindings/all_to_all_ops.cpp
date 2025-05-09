@@ -196,8 +196,7 @@ void fake_dispatch(
     const std::optional<at::Tensor> &boundM,
     bool doSend,
     bool doRecv
-) {
-}
+) {}
 
 template <typename Kernel, typename T, typename U>
 void combineImpl(
@@ -308,8 +307,7 @@ void fake_combine(
     const std::optional<at::Tensor> &boundM,
     bool doSend,
     bool doRecv
-) {
-}
+) {}
 
 #undef _CHECK_TENSOR
 
