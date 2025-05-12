@@ -320,7 +320,7 @@ void register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_internode_create", &create_internode);
 
   m.def("all_to_all_internode_dispatch("
-        "  int self,"
+        "  int fptr,"
         "  Tensor! out_expert_num_tokens,"
         "  Tensor! out_expert_x,"
         "  Tensor!? out_expert_x_scale,"
@@ -335,7 +335,7 @@ void register_all_to_all_ops(torch::Library &m) {
   m.impl("all_to_all_internode_dispatch", c10::kMeta, &fake_dispatch);
 
   m.def("all_to_all_internode_combine("
-        "  int self,"
+        "  int fptr,"
         "  Tensor! out_tokens,"
         "  Tensor indices,"
         "  Tensor weights,"
@@ -350,7 +350,7 @@ void register_all_to_all_ops(torch::Library &m) {
   m.def("all_to_all_intranode_create", &create_intranode);
 
   m.def("all_to_all_intranode_dispatch("
-        "  int self,"
+        "  int fptr,"
         "  Tensor! out_expert_num_tokens,"
         "  Tensor! out_expert_x,"
         "  Tensor!? out_expert_x_scale,"
@@ -365,7 +365,7 @@ void register_all_to_all_ops(torch::Library &m) {
   m.impl("all_to_all_intranode_dispatch", c10::kMeta, &fake_dispatch);
 
   m.def("all_to_all_intranode_combine("
-        "  int self,"
+        "  int fptr,"
         "  Tensor! out_tokens,"
         "  Tensor indices,"
         "  Tensor weights,"
