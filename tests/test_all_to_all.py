@@ -315,7 +315,9 @@ def _worker_test_all_to_all(
 @pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
 @pytest.mark.parametrize("internode", [True, False])
 @pytest.mark.parametrize("use_compile", [False, True])
-def test_all_to_all_4_gpu(in_dtype: str, out_dtype: str, internode: bool, use_compile: bool) -> None:
+def test_all_to_all_4_gpu(
+    in_dtype: str, out_dtype: str, internode: bool, use_compile: bool
+) -> None:
     world_size = 4
     dp_size = 2
     parallel_launch(
