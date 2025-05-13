@@ -5,6 +5,7 @@
 #include <ATen/ATen.h>
 #include <ATen/core/Tensor.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <c10/util/Exception.h>
 #include <torch/csrc/distributed/c10d/GroupRegistry.hpp>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
@@ -152,6 +153,15 @@ void dispatch(
   }
 
   auto *all_to_all = (Kernel *)ptr;
+
+  TORCH_CHECK(indices.size(0) == dpX.size(0), "indices.size(0) must be equal to dpX.size(0)");
+  TORCH_CHECK(
+      indices.size(1) == all_to_all->getNumExpertsPerToken(),
+      "indices.size(1) must be equal to the experts per token"
+  );
+
+  at::cuda::OptionalCUDAGuard const device_guard(device_of(indices));
+
   all_to_all->dispatch(
       Strided1D<int32_t>(
           outExpertNumTokens.data_ptr<int32_t>(), (size_t)outExpertNumTokens.stride(0)
@@ -236,6 +246,8 @@ void combine(
   }
 
   auto *all_to_all = (Kernel *)ptr;
+
+  at::cuda::OptionalCUDAGuard const device_guard(device_of(indices));
 
   switch (expertY.scalar_type()) {
   case at::kFloat: {

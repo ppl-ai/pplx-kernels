@@ -40,6 +40,9 @@ public:
 
   virtual ~AllToAll();
 
+  /// @brief Returns the number of experts each token is routed to.
+  size_t getNumExpertsPerToken() const { return expertsPerToken; }
+
 protected:
   /// The maximum number of tokens per DP group.
   const size_t maxNumTokens;
