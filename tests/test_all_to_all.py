@@ -50,7 +50,7 @@ def _do_test_all_to_all(
     dp_size: int,
     moe: MoEConfig,
     internode: bool,
-    compile: bool,
+    use_compile: bool,
 ) -> None:
     rank = pgi.rank
     local_rank = pgi.local_rank
@@ -175,7 +175,7 @@ def _do_test_all_to_all(
     bound_m = torch.tensor([rank_data.num_tokens], dtype=torch.uint32, device=device)
     logger.debug("[rank=%d] Dispatch", rank)
 
-    dispatch = torch.compile(ata.dispatch) if compile else ata.dispatch
+    dispatch = torch.compile(ata.dispatch) if use_compile else ata.dispatch
 
     dispatch(
         out_expert_num_tokens=expert_num_tokens,
@@ -259,7 +259,7 @@ def _do_test_all_to_all(
 
     logger.debug("[rank=%d] Combine", rank)
 
-    combine = torch.compile(ata.combine) if compile else ata.combine
+    combine = torch.compile(ata.combine) if use_compile else ata.combine
 
     combine(
         out_tokens=y,
@@ -293,7 +293,7 @@ def _worker_test_all_to_all(
     out_dtype: str,
     moe_config: MoEConfig,
     internode: bool,
-    compile: bool = False,
+    use_compile: bool = False,
 ) -> None:
     uid = nvshmem_get_unique_id() if pgi.rank == 0 else nvshmem_alloc_empty_unique_id()
     torch.distributed.broadcast(uid, src=0)
@@ -305,7 +305,7 @@ def _worker_test_all_to_all(
         out_dtype=getattr(torch, out_dtype),
     )
 
-    _do_test_all_to_all(pgi, dp_size, moe_config, internode, compile)
+    _do_test_all_to_all(pgi, dp_size, moe_config, internode, use_compile)
 
     nvshmem_finalize()
 
@@ -314,8 +314,8 @@ def _worker_test_all_to_all(
 @pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn", "float16"])
 @pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
 @pytest.mark.parametrize("internode", [True, False])
-@pytest.mark.parametrize("compile", [False, True])
-def test_all_to_all_4_gpu(in_dtype: str, out_dtype: str, internode: bool, compile: bool) -> None:
+@pytest.mark.parametrize("use_compile", [False, True])
+def test_all_to_all_4_gpu(in_dtype: str, out_dtype: str, internode: bool, use_compile: bool) -> None:
     world_size = 4
     dp_size = 2
     parallel_launch(
@@ -326,7 +326,7 @@ def test_all_to_all_4_gpu(in_dtype: str, out_dtype: str, internode: bool, compil
         out_dtype,
         small_moe,
         internode,
-        compile,
+        use_compile,
     )
 
 
