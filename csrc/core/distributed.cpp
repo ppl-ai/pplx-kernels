@@ -27,4 +27,7 @@ void DistributedNVSHMEM::allToAllImpl(const void *input, void *output, size_t si
   nvshmem_quiet();
 
   CUDACHECK(cudaMemcpy(output, dstBuffer, size * count, cudaMemcpyDeviceToHost));
+
+  nvshmem_free(dstBuffer);
+  nvshmem_free(srcBuffer);
 }
