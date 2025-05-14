@@ -60,7 +60,8 @@ fptr_t create_internode(
     int64_t dpSize,
     int64_t hiddenDim,
     int64_t hiddenDimBytes,
-    int64_t hiddenDimScaleBytes
+    int64_t hiddenDimScaleBytes,
+    int64_t max_sm_count = 0
 ) {
   auto *ptr = new AllToAllInterNode(
       maxNumTokens,
@@ -71,7 +72,8 @@ fptr_t create_internode(
       dpSize,
       hiddenDim,
       hiddenDimBytes,
-      hiddenDimScaleBytes
+      hiddenDimScaleBytes,
+      max_sm_count
   );
   return (fptr_t)ptr;
 }
@@ -86,7 +88,8 @@ fptr_t create_intranode(
     int64_t hiddenDim,
     int64_t hiddenDimBytes,
     int64_t hiddenDimScaleBytes,
-    const std::string &group_name
+    const std::string &group_name,
+    int64_t max_sm_count = 0
 ) {
   auto group = c10d::resolve_process_group(group_name);
   std::shared_ptr<Distributed> distributed = std::make_shared<DistributedTorch>(group);
@@ -100,7 +103,8 @@ fptr_t create_intranode(
       hiddenDim,
       hiddenDimBytes,
       hiddenDimScaleBytes,
-      distributed
+      distributed,
+      max_sm_count
   );
   return (fptr_t)ptr;
 }
