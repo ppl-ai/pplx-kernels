@@ -18,7 +18,8 @@ AllToAllIntraNode::AllToAllIntraNode(
     size_t hiddenDim,
     size_t hiddenDimBytes,
     size_t hiddenDimScaleBytes,
-    std::shared_ptr<Distributed> distributed
+    std::shared_ptr<Distributed> distributed,
+    int max_sm_count
 )
     : AllToAll(
           maxNumTokens,
@@ -29,7 +30,8 @@ AllToAllIntraNode::AllToAllIntraNode(
           dpSize,
           hiddenDim,
           hiddenDimBytes,
-          hiddenDimScaleBytes
+          hiddenDimScaleBytes,
+          max_sm_count
       ) {
 
   // Determine the per-token buffer size. Allocate extra storage for the index.

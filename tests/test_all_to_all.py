@@ -38,6 +38,13 @@ medium_moe = MoEConfig(
 )
 
 
+def _get_number_of_gpu_sm() -> int:
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is not available")
+    device_props = torch.cuda.get_device_properties(0)
+    return device_props.multi_processor_count
+
+
 def _str_1d_tensor(t: torch.Tensor) -> str:
     sl = [f"{x:7.4f}" for x in t.tolist()]
     if len(sl) > 5:
@@ -48,6 +55,7 @@ def _str_1d_tensor(t: torch.Tensor) -> str:
 def _do_test_all_to_all(
     pgi: ProcessGroupInfo,
     dp_size: int,
+    max_sm_count: int,
     moe: MoEConfig,
     internode: bool,
     use_compile: bool,
@@ -80,6 +88,7 @@ def _do_test_all_to_all(
                     * torch.float32.itemsize
                 )
             ),
+            max_sm_count=max_sm_count,
         )
     else:
         ata = AllToAll.intranode(
@@ -100,6 +109,7 @@ def _do_test_all_to_all(
                     * torch.float32.itemsize
                 )
             ),
+            max_sm_count=max_sm_count,
         )
 
     # Generate the same test data on all ranks
@@ -291,6 +301,7 @@ def _worker_test_all_to_all(
     dp_size: int,
     in_dtype: str,
     out_dtype: str,
+    max_sm_count: int,
     moe_config: MoEConfig,
     internode: bool,
     use_compile: bool = False,
@@ -305,7 +316,7 @@ def _worker_test_all_to_all(
         out_dtype=getattr(torch, out_dtype),
     )
 
-    _do_test_all_to_all(pgi, dp_size, moe_config, internode, use_compile)
+    _do_test_all_to_all(pgi, dp_size, max_sm_count, moe_config, internode, use_compile)
 
     nvshmem_finalize()
 
@@ -313,10 +324,13 @@ def _worker_test_all_to_all(
 @pytest.mark.skipif(torch.cuda.device_count() < 4, reason="Requires at least 4 GPUs")
 @pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn", "float16"])
 @pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
+@pytest.mark.parametrize(
+    "max_sm_count", [_get_number_of_gpu_sm(), _get_number_of_gpu_sm() // 2]
+)
 @pytest.mark.parametrize("internode", [True, False])
 @pytest.mark.parametrize("use_compile", [False, True])
 def test_all_to_all_4_gpu(
-    in_dtype: str, out_dtype: str, internode: bool, use_compile: bool
+    in_dtype: str, out_dtype: str, max_sm_count: int, internode: bool, use_compile: bool
 ) -> None:
     world_size = 4
     dp_size = 2
@@ -326,6 +340,7 @@ def test_all_to_all_4_gpu(
         dp_size,
         in_dtype,
         out_dtype,
+        max_sm_count,
         small_moe,
         internode,
         use_compile,
@@ -336,6 +351,7 @@ def _worker_test_all_to_all_multi_node(
     pgi: ProcessGroupInfo,
     in_dtype: str,
     out_dtype: str,
+    max_sm_count: int,
 ) -> None:
     dp_size = 4
     _worker_test_all_to_all(
@@ -343,6 +359,7 @@ def _worker_test_all_to_all_multi_node(
         dp_size,
         in_dtype,
         out_dtype,
+        max_sm_count,
         medium_moe,
         True,
     )
@@ -352,4 +369,7 @@ def _worker_test_all_to_all_multi_node(
 @pytest.mark.parametrize("in_dtype", ["bfloat16", "float8_e4m3fn", "float16"])
 @pytest.mark.parametrize("out_dtype", ["float16", "bfloat16"])
 def test_all_to_all_multi_node(in_dtype: str, out_dtype: str) -> None:
-    parallel_launch_from_env(_worker_test_all_to_all_multi_node, in_dtype, out_dtype)
+    max_sm_count = _get_number_of_gpu_sm()
+    parallel_launch_from_env(
+        _worker_test_all_to_all_multi_node, in_dtype, out_dtype, max_sm_count
+    )
