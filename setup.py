@@ -6,8 +6,6 @@ from setuptools import Command, Extension, find_packages, setup
 from setuptools.command.build import build as _build
 from setuptools.command.build_ext import build_ext
 
-VERSION = "0.0.1"
-
 
 def _get_torch_cmake_prefix_path() -> str:
     import torch
@@ -88,9 +86,6 @@ extensions = [
 ]
 
 setup(
-    name="pplx-kernels",
-    version=VERSION,
-    description="Perplexity Kernels",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={
@@ -103,8 +98,6 @@ setup(
     },
     options={"bdist_wheel": {"py_limited_api": "cp39"}},
     zip_safe=False,
-    install_requires=["torch"],
-    python_requires=">=3.10",
     ext_modules=extensions,
     include_package_data=True,
 )

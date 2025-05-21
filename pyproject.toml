@@ -1,9 +1,13 @@
-[tool.poetry]
-authors = ["Perplexity AI"]
-description = ""
+[project]
 name = "pplx-kernels"
-readme = "README.md"
 version = "0.0.1"
+description = "Perplexity CUDA Kernels"
+readme = "README.md"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 88

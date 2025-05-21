@@ -1,7 +1,8 @@
 import dataclasses
 import logging
 import os
-from typing import Callable, Concatenate, ParamSpec
+from collections.abc import Callable
+from typing import Concatenate, ParamSpec
 
 import pytest
 import torch

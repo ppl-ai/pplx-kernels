@@ -130,7 +130,7 @@ def _do_test_all_to_all(
                 logger.debug(
                     "    x[%d] -> %s",
                     token_idx,
-                    list(zip(indices, weights)),
+                    list(zip(indices, weights, strict=False)),
                 )
             for token_idx in range(rd.num_tokens):
                 logger.debug("    x[%d]=%s", token_idx, _str_1d_tensor(rd.x[token_idx]))
