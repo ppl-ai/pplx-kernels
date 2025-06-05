@@ -6,6 +6,9 @@ add_library(core_lib STATIC
 )
 target_link_libraries(core_lib PUBLIC
     CUDA::cudart
+)
+target_link_libraries(core_lib INTERFACE
     nvshmem::nvshmem
 )
+target_include_directories(core_lib PRIVATE ${NVSHMEM_INCLUDE_DIR})
 set_cuda_compile_options(core_lib)
