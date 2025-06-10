@@ -18,7 +18,8 @@ AllToAllInterNode::AllToAllInterNode(
     unsigned dpSize,
     size_t hiddenDim,
     size_t hiddenDimBytes,
-    size_t hiddenDimScaleBytes
+    size_t hiddenDimScaleBytes,
+    int max_sm_count
 )
     : AllToAll(
           maxNumTokens,
@@ -29,7 +30,8 @@ AllToAllInterNode::AllToAllInterNode(
           dpSize,
           hiddenDim,
           hiddenDimBytes,
-          hiddenDimScaleBytes
+          hiddenDimScaleBytes,
+          max_sm_count
       ),
       maxBatchTokens(numLocalExperts * numDPGroups * maxNumTokens) {
   // Buffers for token counts.
