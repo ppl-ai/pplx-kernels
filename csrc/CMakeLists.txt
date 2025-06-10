@@ -69,6 +69,7 @@ target_link_libraries(pplx_kernels PUBLIC
     CUDA::cuda_driver
     CUDA::cudart
     nvshmem::nvshmem
+    nvshmem::nvshmem_bootstrap_uid
 )
 set_target_properties(pplx_kernels PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../src/pplx_kernels
