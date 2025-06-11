@@ -184,7 +184,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
     unsigned lastGroup = std::min(firstGroup + expertsPerBlock, numExpertsAndGroups);
 
     for (unsigned group = firstGroup + threadIdx.x; group < lastGroup;
-         group += gridDim.x * expertsPerBlock) {
+         group += blockDim.x) {
       const uint32_t expert = group / numDPGroups;
 
       // Fetch the token count per DP, which is non-zero to indicate receipt.
@@ -276,7 +276,7 @@ void AllToAllInterNode::dispatch(
 
   const size_t expertsPerBlock = ceil_div<size_t>(numLocalExperts * numDPGroups, numBlocks);
   const size_t sharedMemorySend = sizeof(uint32_t) * numExperts;
-  const size_t sharedMemoryRecv = sizeof(uint32_t) * expertsPerBlock;
+  const size_t sharedMemoryRecv = sizeof(uint32_t) * expertsPerBlock * 2;
 
   void *args[] = {
       const_cast<int32_t **>(&outNumTokensPerExpert.data),
