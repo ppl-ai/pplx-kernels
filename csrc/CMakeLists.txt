@@ -9,25 +9,29 @@ option(WITH_TESTS "Build tests" OFF)
 option(WITH_BENCHMARKS "Build benchmarks" OFF)
 
 # Convert TORCH_CUDA_ARCH_LIST to CMAKE_CUDA_ARCHITECTURES format
-if(DEFINED TORCH_CUDA_ARCH_LIST)
+if(TORCH_CUDA_ARCH_LIST)
+    message(STATUS "TORCH_CUDA_ARCH_LIST: ${TORCH_CUDA_ARCH_LIST}")
     # Remove +PTX suffix and convert decimal format to integer format
     string(REPLACE "+PTX" "" TORCH_CUDA_ARCH_LIST_CLEAN "${TORCH_CUDA_ARCH_LIST}")
     string(REPLACE " " ";" ARCH_LIST "${TORCH_CUDA_ARCH_LIST_CLEAN}")
     
     set(CMAKE_CUDA_ARCHITECTURES_LIST "")
     foreach(ARCH ${ARCH_LIST})
-        # Handle special cases like 9.0a -> 90a
+        # Handle special cases like 9.0a -> 90a, 10.0 -> 100
         if(ARCH MATCHES "([0-9]+)\\.([0-9]+)([a-z]*)")
             set(CMAKE_ARCH "${CMAKE_MATCH_1}${CMAKE_MATCH_2}${CMAKE_MATCH_3}")
             list(APPEND CMAKE_CUDA_ARCHITECTURES_LIST ${CMAKE_ARCH})
+            message(STATUS "Converted ${ARCH} -> ${CMAKE_ARCH}")
         endif()
     endforeach()
     
     list(JOIN CMAKE_CUDA_ARCHITECTURES_LIST ";" CMAKE_CUDA_ARCHITECTURES_STR)
     set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES_STR} CACHE STRING "CUDA architecture to target")
+    message(STATUS "Final CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
 else()
     # Default to SM90a if no TORCH_CUDA_ARCH_LIST is provided
     set(CMAKE_CUDA_ARCHITECTURES 90a CACHE STRING "CUDA architecture to target")
+    message(STATUS "Using default CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
 
 # === CMake configuration ===
