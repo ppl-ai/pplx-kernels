@@ -18,7 +18,7 @@ target_link_libraries(all_to_all_intranode_lib PUBLIC
     CUDA::cudart
 )
 target_link_libraries(all_to_all_intranode_lib INTERFACE
-    nvshmem::nvshmem
+    nvshmem::nvshmem_host
 )
 target_include_directories(all_to_all_intranode_lib PRIVATE ${NVSHMEM_INCLUDE_DIR})
 set_cuda_compile_options(all_to_all_intranode_lib)
@@ -33,7 +33,7 @@ target_link_libraries(all_to_all_internode_lib PUBLIC
     CUDA::cudart
 )
 target_link_libraries(all_to_all_internode_lib INTERFACE
-    nvshmem::nvshmem
+    nvshmem::nvshmem_host
 )
 target_include_directories(all_to_all_internode_lib PRIVATE ${NVSHMEM_INCLUDE_DIR})
 set_cuda_compile_options(all_to_all_internode_lib)
@@ -50,7 +50,7 @@ if(WITH_TESTS)
         CUDA::cudart
         CUDA::cuda_driver
         MPI::MPI_CXX
-        nvshmem::nvshmem
+        nvshmem::nvshmem_host
     )
     set_cuda_compile_options(test_all_to_all)
     add_test(NAME AllToAllTest
@@ -69,6 +69,6 @@ if (WITH_BENCHMARKS)
         CUDA::cudart
         CUDA::cuda_driver
         MPI::MPI_CXX
-        nvshmem::nvshmem
+        nvshmem::nvshmem_host
     )
 endif()
