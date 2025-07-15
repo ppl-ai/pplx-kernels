@@ -183,8 +183,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
     unsigned firstGroup = blockIdx.x * expertsPerBlock;
     unsigned lastGroup = std::min(firstGroup + expertsPerBlock, numExpertsAndGroups);
 
-    for (unsigned group = firstGroup + threadIdx.x; group < lastGroup;
-         group += blockDim.x) {
+    for (unsigned group = firstGroup + threadIdx.x; group < lastGroup; group += blockDim.x) {
       const uint32_t expert = group / numDPGroups;
 
       // Fetch the token count per DP, which is non-zero to indicate receipt.
