@@ -34,6 +34,8 @@ python3 -m tests.bench_all_to_all
 
 ## Multi-node Testing and Benchmarking
 
+To run an all-to-all test across multiple nodes:
+
 ```bash
 export NODE_RANK= # 0, 1, ..., num_nodes-1
 export WORLD_SIZE= # num_nodes * 8
@@ -43,7 +45,11 @@ export MASTER_PORT=29500
 export NVSHMEM_IB_ENABLE_IBGDA=1
 ```
 
-After settings these environment variables, commands to run the tests and benchmarks are the same as the single-node case.
+An then run the tests normally:
+
+```bash
+pytest -svx tests/test_all_to_all.py
+```
 
 ## Benchmark Results
 
