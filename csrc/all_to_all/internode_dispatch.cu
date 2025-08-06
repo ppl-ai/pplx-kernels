@@ -211,11 +211,11 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
       for (unsigned i = threadIdx.x; i < numTokens; i += blockDim.x) {
         std::byte *xTokenBuffer = xBufferOut + (group * maxNumTokens + i) * tokenStride;
         uint32_t token = tokenStart + i;
-        sourceIndex[token] = *((uint32_t *)(xTokenBuffer + tokenDim));
+        sourceIndex[token] = i;
         sourceExpert[token] = expert;
         sourceOffset[token] = expertStart + i;
         sourceGroup[token] = dp;
-        sourceToken[token] = i;
+        sourceToken[token] = *((uint32_t *)(xTokenBuffer + tokenDim));
       }
     }
 
@@ -227,7 +227,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
       auto expert = sourceExpert[i];
       auto group = expert * numDPGroups + sourceGroup[i];
 
-      std::byte *xTokenBuffer = xBufferOut + (group * maxNumTokens + sourceToken[i]) * tokenStride;
+      std::byte *xTokenBuffer = xBufferOut + (group * maxNumTokens + sourceIndex[i]) * tokenStride;
       std::byte *dstXExpert = expertX + expert * expertXStrideRow;
       float *dstXScaleExpert = expertXScale + expert * expertXScaleStrideCol;
 
