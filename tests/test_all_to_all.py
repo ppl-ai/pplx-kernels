@@ -1,16 +1,14 @@
 import dataclasses
 import logging
 
+import nvshmem.core as nvshmem  # type: ignore[import]
 import pytest
 import torch
+import torch.distributed as dist
+from cuda.core.experimental import Device  # type: ignore[import]
 
+from pplx_kernels import nvshmem_init
 from pplx_kernels.all_to_all import AllToAll
-from pplx_kernels.nvshmem import (
-    nvshmem_alloc_empty_unique_id,
-    nvshmem_finalize,
-    nvshmem_get_unique_id,
-    nvshmem_init,
-)
 
 from .all_to_all_utils import MoEConfig, RankTestData
 from .distributed_utils import (
@@ -295,9 +293,17 @@ def _worker_test_all_to_all(
     internode: bool,
     use_compile: bool = False,
 ) -> None:
-    uid = nvshmem_get_unique_id() if pgi.rank == 0 else nvshmem_alloc_empty_unique_id()
-    torch.distributed.broadcast(uid, src=0)
-    nvshmem_init(uid, pgi.rank, pgi.world_size)
+    num_ranks = dist.get_world_size()
+
+    global_rank = pgi.rank
+    local_rank = pgi.local_rank
+
+    dev = Device(local_rank)
+    dev.set_current()
+
+    nvshmem_init(
+        global_rank=global_rank, local_rank=local_rank, world_size=num_ranks, device=dev
+    )
 
     moe_config = dataclasses.replace(
         moe_config,
@@ -305,9 +311,18 @@ def _worker_test_all_to_all(
         out_dtype=getattr(torch, out_dtype),
     )
 
+    test_script_init_status = nvshmem.direct.init_status()
+    if test_script_init_status < 2 and local_rank == 0:
+        logger.warning(
+            "NVSHMEM hostlib initialization incomplete - status: %d (rank: %d, local_rank: %d)",
+            test_script_init_status,
+            global_rank,
+            local_rank,
+        )
+
     _do_test_all_to_all(pgi, dp_size, moe_config, internode, use_compile)
 
-    nvshmem_finalize()
+    nvshmem.finalize()
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 4, reason="Requires at least 4 GPUs")

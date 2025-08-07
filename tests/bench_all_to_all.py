@@ -6,18 +6,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import nvshmem.core as nvshmem  # type: ignore[import]
 import torch
+from cuda.core.experimental import Device  # type: ignore[import]
+from nvshmem.core import Teams  # type: ignore[import]
 
+from pplx_kernels import PyTorchStreamWrapper, nvshmem_init
 from pplx_kernels.all_to_all import AllToAll
-from pplx_kernels.nvshmem import (
-    nvshmem_alloc_empty_unique_id,
-    nvshmem_alltoall,
-    nvshmem_barrier_all_on_current_stream,
-    nvshmem_finalize,
-    nvshmem_get_unique_id,
-    nvshmem_init,
-    nvshmem_malloc,
-)
 
 from .all_to_all_utils import MoEConfig, RankTestData
 from .distributed_utils import (
@@ -124,8 +119,8 @@ def bench_all_to_all(
     )
     a2a_out_tensor = torch.empty_like(a2a_tensor)
 
-    nvshmem_in = nvshmem_malloc(a2a_shape, torch.uint8, device)
-    nvshmem_out = nvshmem_malloc(a2a_shape, torch.uint8, device)
+    nvshmem_in = nvshmem.tensor(a2a_shape, dtype=torch.uint8)
+    nvshmem_out = nvshmem.tensor(a2a_shape, dtype=torch.uint8)
 
     # Compute stats
     dispatch_bytes = (
@@ -147,11 +142,15 @@ def bench_all_to_all(
             [torch.cuda.Event(enable_timing=True) for _ in range(5)]
             for _ in range(num_samples)
         ]
-        stream = torch.cuda.current_stream()
+
+        torch_stream_wrapped = PyTorchStreamWrapper(torch.cuda.current_stream())
+        torch_stream_ = torch.cuda.current_stream()
 
         for e0, e1, e2, e3, e4 in events:
-            nvshmem_barrier_all_on_current_stream()
-            e0.record(stream)
+            team = Teams.TEAM_WORLD
+            nvshmem.collective.barrier(team, torch_stream_wrapped)
+
+            e0.record(torch_stream_)
 
             ata.dispatch(
                 out_expert_num_tokens=expert_num_tokens,
@@ -162,7 +161,7 @@ def bench_all_to_all(
                 indices=indices,
                 bound_m=bound_m,
             )
-            e1.record(stream)
+            e1.record(torch_stream_)
 
             ata.combine(
                 out_tokens=y,
@@ -171,16 +170,20 @@ def bench_all_to_all(
                 expert_y=expert_y,
                 bound_m=bound_m,
             )
-            e2.record(stream)
+            e2.record(torch_stream_)
 
             torch.distributed.all_to_all_single(a2a_out_tensor, a2a_tensor)
-            e3.record(stream)
 
-            nvshmem_alltoall(nvshmem_out, nvshmem_in)
-            e4.record(stream)
+            e3.record(torch_stream_)
+
+            nvshmem.collective.alltoall(
+                team, nvshmem_out, nvshmem_in, stream=torch_stream_wrapped
+            )
+
+            e4.record(torch_stream_)
 
         # Get latency
-        stream.synchronize()
+        torch_stream_.synchronize()
         sum_dispatch_us = 0.0
         sum_combine_us = 0.0
         sum_a2a_us = 0.0
@@ -224,6 +227,9 @@ def bench_all_to_all(
     # Cleanup
     ata.destroy()
 
+    nvshmem.free_tensor(nvshmem_in)
+    nvshmem.free_tensor(nvshmem_out)
+
     return (
         (dispatch_bytes, combine_bytes, a2a_bytes, nvshmem_bytes),
         result,
@@ -236,9 +242,16 @@ def _worker_bench_all_to_all(
     in_dtype_str: str,
     out_dtype_str: str,
 ) -> None:
-    uid = nvshmem_get_unique_id() if pgi.rank == 0 else nvshmem_alloc_empty_unique_id()
-    torch.distributed.broadcast(uid, src=0)
-    nvshmem_init(uid, pgi.rank, pgi.world_size)
+    num_ranks = pgi.world_size
+    global_rank = pgi.rank
+    local_rank = pgi.local_rank
+
+    dev = Device(local_rank)
+    dev.set_current()
+
+    nvshmem_init(
+        global_rank=global_rank, local_rank=local_rank, world_size=num_ranks, device=dev
+    )
 
     in_dtype = getattr(torch, in_dtype_str)
     out_dtype = getattr(torch, out_dtype_str)
@@ -334,7 +347,7 @@ def _worker_bench_all_to_all(
         f_out.close()
         print("Saved to", outpath)
 
-    nvshmem_finalize()
+    nvshmem.finalize()
 
 
 def main() -> None:

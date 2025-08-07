@@ -73,6 +73,10 @@ fptr_t create_internode(
       hiddenDimBytes,
       hiddenDimScaleBytes
   );
+
+  // Needed to use host-side initialization information in device APIs.
+  nvshmem_init();
+
   return (fptr_t)ptr;
 }
 

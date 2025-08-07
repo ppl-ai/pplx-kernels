@@ -58,7 +58,6 @@ add_subdirectory(core)
 add_library(pplx_kernels SHARED
     bindings/all_to_all_ops.cpp
     bindings/bindings.cpp
-    bindings/nvshmem.cpp
 )
 target_link_libraries(pplx_kernels PUBLIC
     all_to_all_internode_lib
@@ -68,8 +67,9 @@ target_link_libraries(pplx_kernels PUBLIC
     Python::Module
     CUDA::cuda_driver
     CUDA::cudart
-    nvshmem::nvshmem
+    nvshmem::nvshmem_host
     nvshmem::nvshmem_bootstrap_uid
+    nvshmem::nvshmem_device
 )
 set_target_properties(pplx_kernels PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../src/pplx_kernels
