@@ -30,7 +30,8 @@ public:
       size_t hiddenDim,
       size_t hiddenDimBytes,
       size_t hiddenDimScaleBytes,
-      std::shared_ptr<Distributed> distributed
+      std::shared_ptr<Distributed> distributed,
+      int max_sm_count = 0
   );
 
   ~AllToAllIntraNode();
