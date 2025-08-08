@@ -203,8 +203,7 @@ __global__ __launch_bounds__(NUM_WARPS * 32, 1) void dispatchKernel(
     unsigned firstGroup = blockIdx.x * expertsPerBlock;
     unsigned lastGroup = std::min(firstGroup + expertsPerBlock, numExpertsAndRanks);
 
-    for (unsigned group = firstGroup + threadIdx.x; group < lastGroup;
-         group += gridDim.x * expertsPerBlock) {
+    for (unsigned group = firstGroup + threadIdx.x; group < lastGroup; group += blockDim.x) {
       const uint32_t srcRank = group / numLocalExperts;
       const uint32_t srcLocalExpert = group % numLocalExperts;
 
